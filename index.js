@@ -65,8 +65,8 @@ async function getServerUrl (apiKey) {
     throw new Error(`Server responded with ${statusCode}`)
   }
 
-  const { url: serverUrl } = await body.json()
-  return serverUrl
+  const { url: applicationUrl } = await body.json()
+  return applicationUrl
 }
 
 async function run () {
@@ -78,9 +78,10 @@ async function run () {
     const platformaticApiKey = core.getInput('platformatic-api-key')
     await uploadFile(platformaticApiKey, archivePath)
     const bucketId = await createNewBucket(platformaticApiKey)
-    const serverUrl = await getServerUrl(platformaticApiKey)
+    const applicationUrl = await getServerUrl(platformaticApiKey)
 
-    console.log(bucketId, serverUrl)
+    console.log(bucketId, applicationUrl)
+    core.setOutput('platformatic-app-url', applicationUrl)
   } catch (error) {
     core.setFailed(error.message)
   }

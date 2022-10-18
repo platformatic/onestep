@@ -4,6 +4,9 @@ inputs:
   platformatic-api-key:
     description: 'Platformatic API key'
     required: true
+outputs:
+  platformatic-app-url:
+    description: 'URL of the deployed Platformatic DB application'
 runs:
   using: 'node16'
   main: 'index.js'
