@@ -7,13 +7,18 @@ const core = require('@actions/core')
 const tar = require('tar')
 const { request } = require('undici')
 
+const S3_SERVER_URL = 'https://ec9a-109-104-175-199.eu.ngrok.io'
+const COMPENDIUM_URL = 'https://ec9a-109-104-175-199.eu.ngrok.io'
+const GETAWAY_URL = 'https://ec9a-109-104-175-199.eu.ngrok.io'
+
 async function archiveProject (pathToProject, archivePath) {
   const options = { gzip: false, file: archivePath, cwd: pathToProject }
   return tar.create(options, ['.'])
 }
 
-async function uploadFile (serverUrl, apiKey, filePath) {
-  const { statusCode } = await request(serverUrl, {
+async function uploadFile (apiKey, filePath) {
+  const url = S3_SERVER_URL + '/upload'
+  const { statusCode } = await request(url, {
     method: 'POST',
     headers: {
       authorization: `Bearer ${apiKey}`,
@@ -28,15 +33,53 @@ async function uploadFile (serverUrl, apiKey, filePath) {
   }
 }
 
+async function createNewBucket (apiKey) {
+  const url = COMPENDIUM_URL + '/bucket'
+  const { statusCode, body } = await request(url, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({})
+  })
+
+  if (statusCode !== 200) {
+    throw new Error(`Server responded with ${statusCode}`)
+  }
+
+  const { id } = await body.json()
+  return id
+}
+
+async function getServerUrl (apiKey) {
+  const url = GETAWAY_URL + '/url'
+  const { statusCode, body } = await request(url, {
+    method: 'GET',
+    headers: {
+      authorization: `Bearer ${apiKey}`
+    }
+  })
+
+  if (statusCode !== 200) {
+    throw new Error(`Server responded with ${statusCode}`)
+  }
+
+  const { url: serverUrl } = await body.json()
+  return serverUrl
+}
+
 async function run () {
   try {
     const pathToProject = process.env.GITHUB_WORKSPACE
     const archivePath = join(pathToProject, '..', 'project.tar')
     await archiveProject(pathToProject, archivePath)
 
-    const serverUrl = 'https://ec9a-109-104-175-199.eu.ngrok.io'
     const platformaticApiKey = core.getInput('platformatic-api-key')
-    await uploadFile(serverUrl, platformaticApiKey, archivePath)
+    await uploadFile(platformaticApiKey, archivePath)
+    const bucketId = await createNewBucket(platformaticApiKey)
+    const serverUrl = await getServerUrl(platformaticApiKey)
+
+    console.log(bucketId, serverUrl)
   } catch (error) {
     core.setFailed(error.message)
   }
