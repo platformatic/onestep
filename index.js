@@ -38,7 +38,8 @@ async function createNewBucket (apiKey) {
   const { statusCode, body } = await request(url, {
     method: 'POST',
     headers: {
-      authorization: `Bearer ${apiKey}`
+      authorization: `Bearer ${apiKey}`,
+      'content-type': 'application/json'
     },
     body: JSON.stringify({})
   })
