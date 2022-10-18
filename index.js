@@ -7,9 +7,10 @@ const core = require('@actions/core')
 const tar = require('tar')
 const { request } = require('undici')
 
-const S3_SERVER_URL = 'https://ec9a-109-104-175-199.eu.ngrok.io'
-const COMPENDIUM_URL = 'https://ec9a-109-104-175-199.eu.ngrok.io'
-const GETAWAY_URL = 'https://ec9a-109-104-175-199.eu.ngrok.io'
+// TODO: replace with static URLs when ready
+const S3_SERVER_URL = core.getInput('platformatic-server-url')
+const COMPENDIUM_URL = core.getInput('platformatic-server-url')
+const GETAWAY_URL = core.getInput('platformatic-server-url')
 
 async function archiveProject (pathToProject, archivePath) {
   const options = { gzip: false, file: archivePath, cwd: pathToProject }
