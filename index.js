@@ -75,13 +75,18 @@ async function run () {
     const pathToProject = process.env.GITHUB_WORKSPACE
     const archivePath = join(pathToProject, '..', 'project.tar')
     await archiveProject(pathToProject, archivePath)
+    core.info('Project has been successfully archived')
 
     const platformaticApiKey = core.getInput('platformatic-api-key')
     await uploadFile(platformaticApiKey, archivePath)
-    const bucketId = await createNewBucket(platformaticApiKey)
-    const applicationUrl = await getServerUrl(platformaticApiKey)
+    core.info('Project has been successfully uploaded')
 
-    console.log(bucketId, applicationUrl)
+    const bucketId = await createNewBucket(platformaticApiKey)
+    core.info(`New bucket has been created with id ${bucketId}`)
+
+    const applicationUrl = await getServerUrl(platformaticApiKey)
+    core.info(`Your application is available at ${applicationUrl}`)
+
     core.setOutput('platformatic-app-url', applicationUrl)
   } catch (error) {
     core.setFailed(error.message)
