@@ -12,10 +12,11 @@ async function archiveProject (pathToProject, archivePath) {
   return tar.create(options, ['.'])
 }
 
-async function uploadFile (serverUrl, filePath) {
+async function uploadFile (serverUrl, apiKey, filePath) {
   const { statusCode } = await request(serverUrl, {
     method: 'POST',
     headers: {
+      authorization: `Bearer ${apiKey}`,
       'content-type': 'application/octet-stream',
       'accept-encoding': 'gzip,deflate'
     },
@@ -31,10 +32,11 @@ async function run () {
   try {
     const pathToProject = process.env.GITHUB_WORKSPACE
     const archivePath = join(pathToProject, '..', 'project.tar')
-    const serverUrl = 'https://ec9a-109-104-175-199.eu.ngrok.io'
-
     await archiveProject(pathToProject, archivePath)
-    await uploadFile(serverUrl, archivePath)
+
+    const serverUrl = 'https://ec9a-109-104-175-199.eu.ngrok.io'
+    const platformaticApiKey = core.getInput('platformatic-api-key')
+    await uploadFile(serverUrl, platformaticApiKey, archivePath)
   } catch (error) {
     core.setFailed(error.message)
   }

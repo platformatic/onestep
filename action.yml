@@ -1,5 +1,9 @@
 name: 'Platformatic DB Deployer'
 description: 'Deploy a Platformatic DB application to the cloud'
+inputs:
+  platformatic-api-key:
+    description: 'Platformatic API key'
+    required: true
 runs:
   using: 'node16'
   main: 'index.js'
