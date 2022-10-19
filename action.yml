@@ -1,6 +1,9 @@
 name: 'Platformatic DB Deployer'
 description: 'Deploy a Platformatic DB application to the cloud'
 inputs:
+  github-token:
+    description: 'GitHub token'
+    required: true
   platformatic-api-key:
     description: 'Platformatic API key'
     required: true

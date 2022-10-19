@@ -5,6 +5,7 @@ const { createReadStream } = require('fs')
 const { setTimeout } = require('timers/promises')
 
 const core = require('@actions/core')
+const github = require('@actions/github')
 const tar = require('tar')
 const { request } = require('undici')
 
@@ -57,6 +58,11 @@ async function getResponseByReqId (apiKey, requestId) {
 
 async function run () {
   try {
+    const pullRequestInfo = github.context.payload.pull_request
+    if (pullRequestInfo === undefined) {
+      throw new Error('Action must be triggered by pull request')
+    }
+
     const pathToProject = process.env.GITHUB_WORKSPACE
     const archivePath = join(pathToProject, '..', 'project.tar')
     await archiveProject(pathToProject, archivePath)
@@ -87,6 +93,18 @@ async function run () {
 
     core.info('Application has been successfully created')
     core.info('Application URL: ' + applicationUrl)
+
+    const githubToken = core.getInput('github-token')
+    const octokit = github.getOctokit(githubToken)
+
+    await octokit.rest.issues.createComment({
+      ...github.context.repo,
+      issue_number: pullRequestInfo.number,
+      body: [
+        '**Your application was successfully deployed!** :rocket:',
+        `Application url: ${applicationUrl}`
+      ].join('\n')
+    })
 
     core.setOutput('platformatic-app-url', applicationUrl)
   } catch (error) {
