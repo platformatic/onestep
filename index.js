@@ -15,12 +15,6 @@ const FormData = require('form-data')
 const SERVER_URL = core.getInput('platformatic_server_url')
 const PULLING_TIMEOUT = 1000
 
-const ACTION_ENV_VARS = [
-  'INPUT_PLATFORMATIC_API_KEY',
-  'INPUT_PLATFORMATIC_SERVER_URL',
-  'INPUT_GITHUB_TOKEN'
-]
-
 async function archiveProject (pathToProject, archivePath) {
   const options = { gzip: false, file: archivePath, cwd: pathToProject }
   return tar.create(options, ['.'])
@@ -99,9 +93,8 @@ async function getPullRequestDetails (octokit) {
 function getUserEnvVariables () {
   const userEnvVars = {}
   for (const key in process.env) {
-    if (key.startsWith('INPUT_') && !ACTION_ENV_VARS.includes(key)) {
-      const envVarName = key.replace('INPUT_', '')
-      userEnvVars[envVarName] = process.env[key]
+    if (key.startsWith('PLT_')) {
+      userEnvVars[key] = process.env[key]
     }
   }
   return userEnvVars

@@ -24,11 +24,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Deploy project
-        uses: platformatic/onestep@v0.0.2
+        uses: ./.github/deployer-action
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           platformatic_api_key: ${{ secrets.PLATFORMATIC_API_KEY }}
-          platformatic_server_url: https://2fc3-109-104-175-199.eu.ngrok.io
-          custom_env_variable: 'Hello World!'
-          custom_secret_env_variable: ${{ secrets.CUSTOM_SECRET_ENV_VARIABLE }}
+          platformatic_server_url: https://bab9-109-104-175-199.eu.ngrok.io
+        env:
+          plt_custom_variable: test1
+          plt_custom_secret_variable: ${{ secrets.CUSTOM_SECRET_VARIABLE }}
 ```
