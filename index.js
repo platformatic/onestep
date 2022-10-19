@@ -100,7 +100,8 @@ function getUserEnvVariables () {
   const userEnvVars = {}
   for (const key in process.env) {
     if (key.startsWith('INPUT_') && !ACTION_ENV_VARS.includes(key)) {
-      userEnvVars[key] = process.env[key]
+      const envVarName = key.replace('INPUT_', '')
+      userEnvVars[envVarName] = process.env[key]
     }
   }
   return userEnvVars
