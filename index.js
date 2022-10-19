@@ -93,8 +93,9 @@ async function getPullRequestDetails (octokit) {
 function getUserEnvVariables () {
   const userEnvVars = {}
   for (const key in process.env) {
-    if (key.startsWith('PLT_')) {
-      userEnvVars[key] = process.env[key]
+    const upperCaseKey = key.toUpperCase()
+    if (upperCaseKey.startsWith('PLT_')) {
+      userEnvVars[upperCaseKey] = process.env[key]
     }
   }
   return userEnvVars
