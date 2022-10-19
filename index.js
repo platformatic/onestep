@@ -91,6 +91,11 @@ async function getPullRequestDetails (octokit) {
 
 async function run () {
   try {
+    const platformaticApiKey = core.getInput('platformatic-api-key')
+    if (!platformaticApiKey) {
+      throw new Error('There is no Platformatic API key')
+    }
+
     const githubToken = core.getInput('github-token')
     const octokit = github.getOctokit(githubToken)
 
@@ -101,7 +106,6 @@ async function run () {
     await archiveProject(pathToProject, archivePath)
     core.info('Project has been successfully archived')
 
-    const platformaticApiKey = core.getInput('platformatic-api-key')
     const requestId = await uploadCodeArchive(platformaticApiKey, pullRequestDetails, archivePath)
     core.info('Project has been successfully uploaded')
     core.info('Creating Platformatic DB application, request ID: ' + requestId)
