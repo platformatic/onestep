@@ -12,13 +12,13 @@ const { request } = require('undici')
 const FormData = require('form-data')
 
 // TODO: replace with static URLs when ready
-const SERVER_URL = core.getInput('platformatic-server-url')
+const SERVER_URL = core.getInput('platformatic_server_url')
 const PULLING_TIMEOUT = 1000
 
-const ACTION_INPUTS_KEYS = [
-  'platformatic-api-key',
-  'platformatic-server-url',
-  'github-token'
+const ACTION_ENV_VARS = [
+  'INPUT_PLATFORMATIC_API_KEY',
+  'INPUT_PLATFORMATIC_SERVER_URL',
+  'INPUT_GITHUB_TOKEN'
 ]
 
 async function archiveProject (pathToProject, archivePath) {
@@ -99,8 +99,7 @@ async function getPullRequestDetails (octokit) {
 function getUserEnvVariables () {
   const userEnvVars = {}
   for (const key in process.env) {
-    console.log(key)
-    if (key.startsWith('INPUT_') && !ACTION_INPUTS_KEYS.includes(key)) {
+    if (key.startsWith('INPUT_') && !ACTION_ENV_VARS.includes(key)) {
       userEnvVars[key] = process.env[key]
     }
   }
@@ -109,12 +108,12 @@ function getUserEnvVariables () {
 
 async function run () {
   try {
-    const platformaticApiKey = core.getInput('platformatic-api-key')
+    const platformaticApiKey = core.getInput('platformatic_api_key')
     if (!platformaticApiKey) {
       throw new Error('There is no Platformatic API key')
     }
 
-    const githubToken = core.getInput('github-token')
+    const githubToken = core.getInput('github_token')
     const octokit = github.getOctokit(githubToken)
 
     const pullRequestDetails = await getPullRequestDetails(octokit)
@@ -164,7 +163,7 @@ async function run () {
       ].join('\n')
     })
 
-    core.setOutput('platformatic-app-url', applicationUrl)
+    core.setOutput('platformatic_app_url', applicationUrl)
   } catch (error) {
     core.setFailed(error.message)
   }
