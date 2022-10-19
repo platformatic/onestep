@@ -3,30 +3,40 @@
 const { join } = require('path')
 const { createReadStream } = require('fs')
 const { setTimeout } = require('timers/promises')
+const { PassThrough } = require('stream')
 
 const core = require('@actions/core')
 const github = require('@actions/github')
 const tar = require('tar')
 const { request } = require('undici')
+const FormData = require('form-data')
 
 // TODO: replace with static URLs when ready
 const SERVER_URL = core.getInput('platformatic-server-url')
+const PULLING_TIMEOUT = 1000
 
 async function archiveProject (pathToProject, archivePath) {
   const options = { gzip: false, file: archivePath, cwd: pathToProject }
   return tar.create(options, ['.'])
 }
 
-async function uploadFile (apiKey, filePath) {
+async function uploadCodeArchive (apiKey, pullRequestDetails, filePath) {
   const url = SERVER_URL + '/upload'
+
+  const form = new FormData()
+  form.append('pull_request_details', JSON.stringify(pullRequestDetails))
+  form.append('code_archive', createReadStream(filePath))
+
+  const stream = new PassThrough()
+  form.pipe(stream)
+
   const { statusCode, body } = await request(url, {
     method: 'POST',
     headers: {
       authorization: `Bearer ${apiKey}`,
-      'content-type': 'application/octet-stream',
-      'accept-encoding': 'gzip,deflate'
+      ...form.getHeaders()
     },
-    body: createReadStream(filePath)
+    body: stream
   })
 
   if (statusCode !== 200) {
@@ -56,12 +66,35 @@ async function getResponseByReqId (apiKey, requestId) {
   return await body.json()
 }
 
+async function getPullRequestDetails (octokit) {
+  const pullRequestInfo = github.context.payload.pull_request
+  if (pullRequestInfo === undefined) {
+    throw new Error('Action must be triggered by pull request')
+  }
+
+  const pullRequestFullInfo = await octokit.rest.pulls.get({
+    owner: pullRequestInfo.base.repo.owner.login,
+    repo: pullRequestInfo.base.repo.name,
+    pull_number: pullRequestInfo.number
+  })
+
+  return {
+    number: pullRequestFullInfo.data.number,
+    url: pullRequestFullInfo.data.html_url,
+    title: pullRequestFullInfo.data.title,
+    headSha: pullRequestFullInfo.data.head.sha,
+    additions: pullRequestFullInfo.data.additions,
+    deletions: pullRequestFullInfo.data.deletions,
+    changedFiles: pullRequestFullInfo.data.changed_files
+  }
+}
+
 async function run () {
   try {
-    const pullRequestInfo = github.context.payload.pull_request
-    if (pullRequestInfo === undefined) {
-      throw new Error('Action must be triggered by pull request')
-    }
+    const githubToken = core.getInput('github-token')
+    const octokit = github.getOctokit(githubToken)
+
+    const pullRequestDetails = await getPullRequestDetails(octokit)
 
     const pathToProject = process.env.GITHUB_WORKSPACE
     const archivePath = join(pathToProject, '..', 'project.tar')
@@ -69,7 +102,7 @@ async function run () {
     core.info('Project has been successfully archived')
 
     const platformaticApiKey = core.getInput('platformatic-api-key')
-    const requestId = await uploadFile(platformaticApiKey, archivePath)
+    const requestId = await uploadCodeArchive(platformaticApiKey, pullRequestDetails, archivePath)
     core.info('Project has been successfully uploaded')
     core.info('Creating Platformatic DB application, request ID: ' + requestId)
 
@@ -79,7 +112,7 @@ async function run () {
       switch (response.status) {
         case 'pending':
           core.info('Application is not ready yet, waiting...')
-          await setTimeout(1000)
+          await setTimeout(PULLING_TIMEOUT)
           break
         case 'ready':
           applicationUrl = response.applicationUrl
@@ -94,12 +127,9 @@ async function run () {
     core.info('Application has been successfully created')
     core.info('Application URL: ' + applicationUrl)
 
-    const githubToken = core.getInput('github-token')
-    const octokit = github.getOctokit(githubToken)
-
     await octokit.rest.issues.createComment({
       ...github.context.repo,
-      issue_number: pullRequestInfo.number,
+      issue_number: pullRequestDetails.number,
       body: [
         '**Your application was successfully deployed!** :rocket:',
         `Application url: ${applicationUrl}`
