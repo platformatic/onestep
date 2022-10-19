@@ -15,15 +15,22 @@ const FormData = require('form-data')
 const SERVER_URL = core.getInput('platformatic-server-url')
 const PULLING_TIMEOUT = 1000
 
+const ACTION_INPUTS_KEYS = [
+  'platformatic-api-key',
+  'platformatic-server-url',
+  'github-token'
+]
+
 async function archiveProject (pathToProject, archivePath) {
   const options = { gzip: false, file: archivePath, cwd: pathToProject }
   return tar.create(options, ['.'])
 }
 
-async function uploadCodeArchive (apiKey, pullRequestDetails, filePath) {
+async function uploadCodeArchive (apiKey, pullRequestDetails, userEnvVars, filePath) {
   const url = SERVER_URL + '/upload'
 
   const form = new FormData()
+  form.append('user_env_vars', JSON.stringify(userEnvVars))
   form.append('pull_request_details', JSON.stringify(pullRequestDetails))
   form.append('code_archive', createReadStream(filePath))
 
@@ -89,6 +96,17 @@ async function getPullRequestDetails (octokit) {
   }
 }
 
+function getUserEnvVariables () {
+  const userEnvVars = {}
+  for (const key in process.env) {
+    console.log(key)
+    if (key.startsWith('INPUT_') && !ACTION_INPUTS_KEYS.includes(key)) {
+      userEnvVars[key] = process.env[key]
+    }
+  }
+  return userEnvVars
+}
+
 async function run () {
   try {
     const platformaticApiKey = core.getInput('platformatic-api-key')
@@ -106,7 +124,13 @@ async function run () {
     await archiveProject(pathToProject, archivePath)
     core.info('Project has been successfully archived')
 
-    const requestId = await uploadCodeArchive(platformaticApiKey, pullRequestDetails, archivePath)
+    const userEnvVars = getUserEnvVariables()
+    const requestId = await uploadCodeArchive(
+      platformaticApiKey,
+      pullRequestDetails,
+      userEnvVars,
+      archivePath
+    )
     core.info('Project has been successfully uploaded')
     core.info('Creating Platformatic DB application, request ID: ' + requestId)
 
