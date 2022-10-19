@@ -26,7 +26,9 @@ jobs:
       - name: Deploy project
         uses: platformatic/onestep@v0.0.2
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          platformatic-api-key: ${{ secrets.PLATFORMATIC_API_KEY }}
-          platformatic-server-url: https://2fc3-109-104-175-199.eu.ngrok.io
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          platformatic_api_key: ${{ secrets.PLATFORMATIC_API_KEY }}
+          platformatic_server_url: https://2fc3-109-104-175-199.eu.ngrok.io
+          custom_env_variable: 'Hello World!'
+          custom_secret_env_variable: ${{ secrets.CUSTOM_SECRET_ENV_VARIABLE }}
 ```
