@@ -1,6 +1,7 @@
 'use strict'
 
 const { join } = require('path')
+const { createHash } = require('crypto')
 const { readFile } = require('fs/promises')
 const { setTimeout } = require('timers/promises')
 
@@ -18,7 +19,7 @@ async function archiveProject (pathToProject, archivePath) {
   return tar.create(options, ['.'])
 }
 
-async function createBucket (apiKey, pullRequestDetails, userEnvVars) {
+async function createBucket (apiKey, pullRequestDetails, userEnvVars, md5Checksum) {
   const url = SERVER_URL + '/bucket'
 
   const { statusCode, body } = await request(url, {
@@ -27,7 +28,7 @@ async function createBucket (apiKey, pullRequestDetails, userEnvVars) {
       authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ userEnvVars, pullRequestDetails })
+    body: JSON.stringify({ userEnvVars, pullRequestDetails, md5Checksum })
   })
 
   if (statusCode !== 200) {
@@ -37,19 +38,23 @@ async function createBucket (apiKey, pullRequestDetails, userEnvVars) {
   return body.json()
 }
 
-async function uploadCodeArchive (uploadUrl, filePath) {
-  const file = await readFile(filePath)
+async function uploadCodeArchive (uploadUrl, fileData, md5Checksum) {
   const { statusCode } = await request(uploadUrl, {
     method: 'PUT',
     headers: {
-      'Content-Type': 'application/x-tar'
+      'Content-Type': 'application/x-tar',
+      'Content-MD5': md5Checksum
     },
-    body: file
+    body: fileData
   })
 
   if (statusCode !== 200) {
     throw new Error(`Failed to upload code archive: ${statusCode}`)
   }
+}
+
+function generateMD5Hash (buffer) {
+  return createHash('md5').update(buffer).digest('base64')
 }
 
 async function getResponseByReqId (apiKey, requestId) {
@@ -123,12 +128,17 @@ async function run () {
     core.info('Project has been successfully archived')
 
     const userEnvVars = getUserEnvVariables()
+
+    const fileData = await readFile(archivePath)
+    const md5Checksum = generateMD5Hash(fileData)
+
     const { requestId, uploadUrl } = await createBucket(
       platformaticApiKey,
       pullRequestDetails,
-      userEnvVars
+      userEnvVars,
+      md5Checksum
     )
-    await uploadCodeArchive(uploadUrl, archivePath)
+    await uploadCodeArchive(uploadUrl, fileData, md5Checksum)
     core.info('Project has been successfully uploaded')
     core.info('Creating Platformatic DB application, request ID: ' + requestId)
 
