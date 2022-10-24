@@ -1,15 +1,13 @@
 'use strict'
 
 const { join } = require('path')
-const { createReadStream } = require('fs')
+const { readFile } = require('fs/promises')
 const { setTimeout } = require('timers/promises')
-const { PassThrough } = require('stream')
 
 const core = require('@actions/core')
 const github = require('@actions/github')
 const tar = require('tar')
 const { request } = require('undici')
-const FormData = require('form-data')
 
 // TODO: replace with static URLs when ready
 const SERVER_URL = core.getInput('platformatic_server_url')
@@ -20,32 +18,38 @@ async function archiveProject (pathToProject, archivePath) {
   return tar.create(options, ['.'])
 }
 
-async function uploadCodeArchive (apiKey, pullRequestDetails, userEnvVars, filePath) {
-  const url = SERVER_URL + '/upload'
-
-  const form = new FormData()
-  form.append('user_env_vars', JSON.stringify(userEnvVars))
-  form.append('pull_request_details', JSON.stringify(pullRequestDetails))
-  form.append('code_archive', createReadStream(filePath))
-
-  const stream = new PassThrough()
-  form.pipe(stream)
+async function createBucket (apiKey, pullRequestDetails, userEnvVars) {
+  const url = SERVER_URL + '/bucket'
 
   const { statusCode, body } = await request(url, {
     method: 'POST',
     headers: {
       authorization: `Bearer ${apiKey}`,
-      ...form.getHeaders()
+      'Content-Type': 'application/json'
     },
-    body: stream
+    body: JSON.stringify({ userEnvVars, pullRequestDetails })
   })
 
   if (statusCode !== 200) {
     throw new Error(`Server responded with ${statusCode}`)
   }
 
-  const { requestId } = await body.json()
-  return requestId
+  return body.json()
+}
+
+async function uploadCodeArchive (uploadUrl, filePath) {
+  const file = await readFile(filePath)
+  const { statusCode } = await request(uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/x-tar'
+    },
+    body: file
+  })
+
+  if (statusCode !== 200) {
+    throw new Error(`Failed to upload code archive: ${statusCode}`)
+  }
 }
 
 async function getResponseByReqId (apiKey, requestId) {
@@ -119,12 +123,12 @@ async function run () {
     core.info('Project has been successfully archived')
 
     const userEnvVars = getUserEnvVariables()
-    const requestId = await uploadCodeArchive(
+    const { requestId, uploadUrl } = await createBucket(
       platformaticApiKey,
       pullRequestDetails,
-      userEnvVars,
-      archivePath
+      userEnvVars
     )
+    await uploadCodeArchive(uploadUrl, archivePath)
     core.info('Project has been successfully uploaded')
     core.info('Creating Platformatic DB application, request ID: ' + requestId)
 
