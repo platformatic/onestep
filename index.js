@@ -19,8 +19,8 @@ async function archiveProject (pathToProject, archivePath) {
   return tar.create(options, ['.'])
 }
 
-async function createBucket (apiKey, pullRequestDetails, userEnvVars, md5Checksum) {
-  const url = SERVER_URL + '/bucket'
+async function getUploadUrl (apiKey, pullRequestDetails, md5Checksum) {
+  const url = SERVER_URL + '/api/upload-url'
 
   const { statusCode, body } = await request(url, {
     method: 'POST',
@@ -28,14 +28,19 @@ async function createBucket (apiKey, pullRequestDetails, userEnvVars, md5Checksu
       authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ userEnvVars, pullRequestDetails, md5Checksum })
+    body: JSON.stringify({
+      prNumber: pullRequestDetails.prNumber,
+      location: pullRequestDetails.location,
+      md5Checksum
+    })
   })
 
   if (statusCode !== 200) {
-    throw new Error(`Server responded with ${statusCode}`)
+    throw new Error(`Could not get upload URL: ${statusCode}`)
   }
 
-  return body.json()
+  const { uploadUrl } = await body.json()
+  return uploadUrl
 }
 
 async function uploadCodeArchive (uploadUrl, fileData, md5Checksum) {
@@ -53,27 +58,62 @@ async function uploadCodeArchive (uploadUrl, fileData, md5Checksum) {
   }
 }
 
+async function createRun (apiKey, pullRequestDetails, userEnvVars) {
+  const url = SERVER_URL + '/api/runs'
+
+  const { statusCode, body } = await request(url, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+
+    body: JSON.stringify({ userEnvVars, pullRequestDetails })
+  })
+
+  if (statusCode !== 200) {
+    throw new Error(`Could not create a bundle: ${statusCode}`)
+  }
+
+  return body.json()
+}
+
 function generateMD5Hash (buffer) {
   return createHash('md5').update(buffer).digest('base64')
 }
 
-async function getResponseByReqId (apiKey, requestId) {
-  const url = SERVER_URL + '/url'
+async function getRunStatus (apiKey, runId) {
+  const url = SERVER_URL + `/api/runs/${runId}/status`
   const { statusCode, body } = await request(url, {
     method: 'GET',
-    query: {
-      request_id: requestId
-    },
     headers: {
       authorization: `Bearer ${apiKey}`
     }
   })
 
   if (statusCode !== 200) {
-    throw new Error(`Server responded with ${statusCode}`)
+    throw new Error(`Could not get run info: ${statusCode}`)
   }
 
-  return await body.json()
+  const { status } = await body.json()
+  return status
+}
+
+async function getRunUrl (apiKey, runId) {
+  const url = SERVER_URL + `/api/runs/${runId}/url`
+  const { statusCode, body } = await request(url, {
+    method: 'GET',
+    headers: {
+      authorization: `Bearer ${apiKey}`
+    }
+  })
+
+  if (statusCode !== 200) {
+    throw new Error(`Could not get application URL: ${statusCode}`)
+  }
+
+  const { applicationUrl } = await body.json()
+  return applicationUrl
 }
 
 async function getPullRequestDetails (octokit) {
@@ -89,10 +129,12 @@ async function getPullRequestDetails (octokit) {
   })
 
   return {
-    number: pullRequestFullInfo.data.number,
     url: pullRequestFullInfo.data.html_url,
     title: pullRequestFullInfo.data.title,
-    headSha: pullRequestFullInfo.data.head.sha,
+    branch: pullRequestFullInfo.data.head.ref,
+    prNumber: pullRequestFullInfo.data.number,
+    location: pullRequestFullInfo.data.head.repo.full_name,
+    commitHash: pullRequestFullInfo.data.head.sha,
     additions: pullRequestFullInfo.data.additions,
     deletions: pullRequestFullInfo.data.deletions,
     changedFiles: pullRequestFullInfo.data.changed_files
@@ -132,40 +174,32 @@ async function run () {
     const fileData = await readFile(archivePath)
     const md5Checksum = generateMD5Hash(fileData)
 
-    const { requestId, uploadUrl } = await createBucket(
-      platformaticApiKey,
-      pullRequestDetails,
-      userEnvVars,
-      md5Checksum
-    )
+    core.info('Uploading code archive to the cloud...')
+    const uploadUrl = await getUploadUrl(platformaticApiKey, pullRequestDetails, md5Checksum)
     await uploadCodeArchive(uploadUrl, fileData, md5Checksum)
     core.info('Project has been successfully uploaded')
-    core.info('Creating Platformatic DB application, request ID: ' + requestId)
 
-    let applicationUrl = null
-    while (applicationUrl === null) {
-      const response = await getResponseByReqId(platformaticApiKey, requestId)
-      switch (response.status) {
-        case 'pending':
-          core.info('Application is not ready yet, waiting...')
-          await setTimeout(PULLING_TIMEOUT)
-          break
-        case 'ready':
-          applicationUrl = response.applicationUrl
-          break
-        case 'error':
-          throw new Error('Application creation failed: ', response.error)
-        default:
-          throw new Error('Unknown response status: ', response.status)
-      }
+    const { runId } = await createRun(platformaticApiKey, pullRequestDetails, userEnvVars)
+    core.info('Creating Platformatic DB application, run ID: ' + runId)
+
+    let status = 'starting'
+    while (status === 'starting') {
+      core.info('Application is not ready yet, waiting...')
+      status = await getRunStatus(platformaticApiKey, runId)
+      await setTimeout(PULLING_TIMEOUT)
     }
 
+    if (status === 'failed') {
+      throw new Error('Application failed to start')
+    }
+
+    const applicationUrl = await getRunUrl(platformaticApiKey, runId)
     core.info('Application has been successfully created')
     core.info('Application URL: ' + applicationUrl)
 
     await octokit.rest.issues.createComment({
       ...github.context.repo,
-      issue_number: pullRequestDetails.number,
+      issue_number: pullRequestDetails.prNumber,
       body: [
         '**Your application was successfully deployed!** :rocket:',
         `Application url: ${applicationUrl}`
