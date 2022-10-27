@@ -58,8 +58,8 @@ async function uploadCodeArchive (uploadUrl, fileData, md5Checksum) {
   }
 }
 
-async function createRun (apiKey, pullRequestDetails, userEnvVars) {
-  const url = SERVER_URL + '/api/runs'
+async function createDeployment (apiKey, pullRequestDetails, userEnvVars) {
+  const url = SERVER_URL + '/api/deployments'
 
   const { statusCode, body } = await request(url, {
     method: 'POST',
@@ -82,8 +82,8 @@ function generateMD5Hash (buffer) {
   return createHash('md5').update(buffer).digest('base64')
 }
 
-async function getRunStatus (apiKey, runId) {
-  const url = SERVER_URL + `/api/runs/${runId}/status`
+async function getDeploymentStatus (apiKey, deploymentId) {
+  const url = SERVER_URL + `/api/deployments/${deploymentId}/status`
   const { statusCode, body } = await request(url, {
     method: 'GET',
     headers: {
@@ -92,15 +92,15 @@ async function getRunStatus (apiKey, runId) {
   })
 
   if (statusCode !== 200) {
-    throw new Error(`Could not get run info: ${statusCode}`)
+    throw new Error(`Could not get deployment info: ${statusCode}`)
   }
 
   const { status } = await body.json()
   return status
 }
 
-async function getRunUrl (apiKey, runId) {
-  const url = SERVER_URL + `/api/runs/${runId}/url`
+async function getDeploymentUrl (apiKey, deploymentId) {
+  const url = SERVER_URL + `/api/deployments/${deploymentId}/url`
   const { statusCode, body } = await request(url, {
     method: 'GET',
     headers: {
@@ -179,13 +179,13 @@ async function run () {
     await uploadCodeArchive(uploadUrl, fileData, md5Checksum)
     core.info('Project has been successfully uploaded')
 
-    const { runId } = await createRun(platformaticApiKey, pullRequestDetails, userEnvVars)
-    core.info('Creating Platformatic DB application, run ID: ' + runId)
+    const { deploymentId } = await createDeployment(platformaticApiKey, pullRequestDetails, userEnvVars)
+    core.info('Creating Platformatic DB application, deployment ID: ' + deploymentId)
 
     let status = 'starting'
     while (status === 'starting') {
       core.info('Application is not ready yet, waiting...')
-      status = await getRunStatus(platformaticApiKey, runId)
+      status = await getDeploymentStatus(platformaticApiKey, deploymentId)
       await setTimeout(PULLING_TIMEOUT)
     }
 
@@ -193,7 +193,7 @@ async function run () {
       throw new Error('Application failed to start')
     }
 
-    const applicationUrl = await getRunUrl(platformaticApiKey, runId)
+    const applicationUrl = await getDeploymentUrl(platformaticApiKey, deploymentId)
     core.info('Application has been successfully created')
     core.info('Application URL: ' + applicationUrl)
 
