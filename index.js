@@ -140,7 +140,7 @@ async function run () {
     const pathToProject = process.env.GITHUB_WORKSPACE
 
     const userEnvVars = getUserEnvVariables()
-    const githubEnvFilePath = join(pathToProject, '.github-env')
+    const githubEnvFilePath = join(pathToProject, '.github', '.platformatic.env')
     await writeFile(githubEnvFilePath, serializeEnvVariables(userEnvVars))
 
     const archivePath = join(pathToProject, '..', 'project.tar')
