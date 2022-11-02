@@ -2,8 +2,7 @@
 
 const { join } = require('path')
 const { createHash } = require('crypto')
-const { readFile } = require('fs/promises')
-const { setTimeout } = require('timers/promises')
+const { readFile, writeFile } = require('fs/promises')
 
 const core = require('@actions/core')
 const github = require('@actions/github')
@@ -11,16 +10,16 @@ const tar = require('tar')
 const { request } = require('undici')
 
 // TODO: replace with static URLs when ready
-const SERVER_URL = core.getInput('platformatic_server_url')
-const PULLING_TIMEOUT = 1000
+const STEVE_SERVER_URL = core.getInput('steve_server_url')
+const HARRY_SERVER_URL = core.getInput('harry_server_url')
 
 async function archiveProject (pathToProject, archivePath) {
   const options = { gzip: false, file: archivePath, cwd: pathToProject }
   return tar.create(options, ['.'])
 }
 
-async function getUploadUrl (apiKey, pullRequestDetails, md5Checksum) {
-  const url = SERVER_URL + '/api/upload-url'
+async function createBundle (apiKey, pullRequestDetails, codeChecksum) {
+  const url = STEVE_SERVER_URL + '/api/bundles'
 
   const { statusCode, body } = await request(url, {
     method: 'POST',
@@ -28,27 +27,24 @@ async function getUploadUrl (apiKey, pullRequestDetails, md5Checksum) {
       authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      prNumber: pullRequestDetails.prNumber,
-      location: pullRequestDetails.location,
-      md5Checksum
-    })
+
+    body: JSON.stringify({ codeChecksum, pullRequestDetails })
   })
 
   if (statusCode !== 200) {
-    throw new Error(`Could not get upload URL: ${statusCode}`)
+    throw new Error(`Could not create a bundle: ${statusCode}`)
   }
 
-  const { uploadUrl } = await body.json()
-  return uploadUrl
+  return body.json()
 }
 
-async function uploadCodeArchive (uploadUrl, fileData, md5Checksum) {
-  const { statusCode } = await request(uploadUrl, {
+async function uploadCodeArchive (uploadToken, fileData) {
+  const url = HARRY_SERVER_URL + '/upload'
+  const { statusCode } = await request(url, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/x-tar',
-      'Content-MD5': md5Checksum
+      authorization: `Bearer ${uploadToken}`
     },
     body: fileData
   })
@@ -58,8 +54,8 @@ async function uploadCodeArchive (uploadUrl, fileData, md5Checksum) {
   }
 }
 
-async function createDeployment (apiKey, pullRequestDetails, userEnvVars) {
-  const url = SERVER_URL + '/api/deployments'
+async function createDeployment (apiKey, bundleId) {
+  const url = STEVE_SERVER_URL + '/api/deployments'
 
   const { statusCode, body } = await request(url, {
     method: 'POST',
@@ -68,7 +64,7 @@ async function createDeployment (apiKey, pullRequestDetails, userEnvVars) {
       'Content-Type': 'application/json'
     },
 
-    body: JSON.stringify({ userEnvVars, pullRequestDetails })
+    body: JSON.stringify({ bundleId })
   })
 
   if (statusCode !== 200) {
@@ -80,40 +76,6 @@ async function createDeployment (apiKey, pullRequestDetails, userEnvVars) {
 
 function generateMD5Hash (buffer) {
   return createHash('md5').update(buffer).digest('base64')
-}
-
-async function getDeploymentStatus (apiKey, deploymentId) {
-  const url = SERVER_URL + `/api/deployments/${deploymentId}/status`
-  const { statusCode, body } = await request(url, {
-    method: 'GET',
-    headers: {
-      authorization: `Bearer ${apiKey}`
-    }
-  })
-
-  if (statusCode !== 200) {
-    throw new Error(`Could not get deployment info: ${statusCode}`)
-  }
-
-  const { status } = await body.json()
-  return status
-}
-
-async function getDeploymentUrl (apiKey, deploymentId) {
-  const url = SERVER_URL + `/api/deployments/${deploymentId}/url`
-  const { statusCode, body } = await request(url, {
-    method: 'GET',
-    headers: {
-      authorization: `Bearer ${apiKey}`
-    }
-  })
-
-  if (statusCode !== 200) {
-    throw new Error(`Could not get application URL: ${statusCode}`)
-  }
-
-  const { applicationUrl } = await body.json()
-  return applicationUrl
 }
 
 async function getPullRequestDetails (octokit) {
@@ -130,14 +92,14 @@ async function getPullRequestDetails (octokit) {
 
   return {
     url: pullRequestFullInfo.data.html_url,
-    title: pullRequestFullInfo.data.title,
     branch: pullRequestFullInfo.data.head.ref,
+    prTitle: pullRequestFullInfo.data.title,
     prNumber: pullRequestFullInfo.data.number,
     location: pullRequestFullInfo.data.head.repo.full_name,
     commitHash: pullRequestFullInfo.data.head.sha,
+    lastCommitUsername: pullRequestFullInfo.data.head.user.login,
     additions: pullRequestFullInfo.data.additions,
-    deletions: pullRequestFullInfo.data.deletions,
-    changedFiles: pullRequestFullInfo.data.changed_files
+    deletions: pullRequestFullInfo.data.deletions
   }
 }
 
@@ -152,6 +114,18 @@ function getUserEnvVariables () {
   return userEnvVars
 }
 
+function serializeEnvVariables (envVars) {
+  let serializedEnvVars = ''
+  for (const key in envVars) {
+    serializedEnvVars += `${key}=${envVars[key]}\n`
+  }
+  return serializedEnvVars
+}
+
+function createApplicationUrl (applicationDomain) {
+  return `https://${applicationDomain}`
+}
+
 async function run () {
   try {
     const platformaticApiKey = core.getInput('platformatic_api_key')
@@ -163,39 +137,35 @@ async function run () {
     const octokit = github.getOctokit(githubToken)
 
     const pullRequestDetails = await getPullRequestDetails(octokit)
-
     const pathToProject = process.env.GITHUB_WORKSPACE
+
+    const userEnvVars = getUserEnvVariables()
+    const githubEnvFilePath = join(pathToProject, '.github-env')
+    await writeFile(githubEnvFilePath, serializeEnvVariables(userEnvVars))
+
     const archivePath = join(pathToProject, '..', 'project.tar')
     await archiveProject(pathToProject, archivePath)
     core.info('Project has been successfully archived')
 
-    const userEnvVars = getUserEnvVariables()
-
     const fileData = await readFile(archivePath)
-    const md5Checksum = generateMD5Hash(fileData)
+    const codeChecksum = generateMD5Hash(fileData)
+
+    const { bundleId, uploadToken } = await createBundle(
+      platformaticApiKey,
+      pullRequestDetails,
+      codeChecksum
+    )
 
     core.info('Uploading code archive to the cloud...')
-    const uploadUrl = await getUploadUrl(platformaticApiKey, pullRequestDetails, md5Checksum)
-    await uploadCodeArchive(uploadUrl, fileData, md5Checksum)
+    await uploadCodeArchive(uploadToken, fileData)
     core.info('Project has been successfully uploaded')
 
-    const { deploymentId } = await createDeployment(platformaticApiKey, pullRequestDetails, userEnvVars)
-    core.info('Creating Platformatic DB application, deployment ID: ' + deploymentId)
-
-    let status = 'starting'
-    while (status === 'starting') {
-      core.info('Application is not ready yet, waiting...')
-      status = await getDeploymentStatus(platformaticApiKey, deploymentId)
-      await setTimeout(PULLING_TIMEOUT)
-    }
-
-    if (status === 'failed') {
-      throw new Error('Application failed to start')
-    }
-
-    const applicationUrl = await getDeploymentUrl(platformaticApiKey, deploymentId)
+    const { domainName } = await createDeployment(platformaticApiKey, bundleId)
+    const applicationUrl = createApplicationUrl(domainName)
     core.info('Application has been successfully created')
-    core.info('Application URL: ' + applicationUrl)
+    core.info('Application URL: ' + domainName)
+
+    // TODO: add prewarm request for application url
 
     await octokit.rest.issues.createComment({
       ...github.context.repo,

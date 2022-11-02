@@ -7,8 +7,11 @@ inputs:
   platformatic_api_key:
     description: 'Platformatic API key'
     required: true
-  platformatic_server_url:
-    description: 'This is a test parameter'
+  steve_server_url:
+    description: 'Url to the Steve server (test parameter)'
+    required: true
+  harry_server_url:
+    description: 'Url to the Harry server (test parameter)'
     required: true
 outputs:
   platformatic_app_url:
