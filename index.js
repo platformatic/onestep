@@ -46,7 +46,8 @@ async function uploadCodeArchive (uploadToken, fileData) {
       'Content-Type': 'application/x-tar',
       authorization: `Bearer ${uploadToken}`
     },
-    body: fileData
+    body: fileData,
+    headersTimeout: 60 * 1000
   })
 
   if (statusCode !== 200) {
