@@ -91,7 +91,6 @@ async function getPullRequestDetails (octokit) {
   })
 
   return {
-    url: pullRequestFullInfo.data.html_url,
     branch: pullRequestFullInfo.data.head.ref,
     prTitle: pullRequestFullInfo.data.title,
     prNumber: pullRequestFullInfo.data.number,
