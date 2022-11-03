@@ -97,7 +97,7 @@ async function getPullRequestDetails (octokit) {
     prNumber: pullRequestFullInfo.data.number,
     location: pullRequestFullInfo.data.head.repo.full_name,
     commitHash: pullRequestFullInfo.data.head.sha,
-    lastCommitUsername: pullRequestFullInfo.data.head.user.login,
+    commitUsername: pullRequestFullInfo.data.head.user.login,
     additions: pullRequestFullInfo.data.additions,
     deletions: pullRequestFullInfo.data.deletions
   }
