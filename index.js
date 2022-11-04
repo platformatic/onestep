@@ -2,6 +2,7 @@
 
 const { join } = require('path')
 const { createHash } = require('crypto')
+const { existsSync } = require('fs')
 const { readFile, writeFile } = require('fs/promises')
 
 const core = require('@actions/core')
@@ -103,7 +104,7 @@ async function getPullRequestDetails (octokit) {
   }
 }
 
-function getUserEnvVariables () {
+function getGithubEnvVariables () {
   const userEnvVars = {}
   for (const key in process.env) {
     const upperCaseKey = key.toUpperCase()
@@ -122,8 +123,29 @@ function serializeEnvVariables (envVars) {
   return serializedEnvVars
 }
 
+function parseEnvVariables (envVars) {
+  const parsedEnvVars = {}
+  for (const line of envVars.split('\n')) {
+    const [key, value] = line.split('=')
+    parsedEnvVars[key] = value
+  }
+  return parsedEnvVars
+}
+
 function createApplicationUrl (applicationDomain) {
   return `https://${applicationDomain}`
+}
+
+async function mergeEnvVariables (envFilePath) {
+  let userEnvVars = {}
+  if (existsSync(envFilePath)) {
+    const userEnvFile = await readFile(envFilePath, 'utf8')
+    userEnvVars = parseEnvVariables(userEnvFile)
+  }
+
+  const githubEnvVars = getGithubEnvVariables()
+  const mergedEnvVars = { ...githubEnvVars, ...userEnvVars }
+  await writeFile(envFilePath, serializeEnvVariables(mergedEnvVars))
 }
 
 async function run () {
@@ -139,9 +161,10 @@ async function run () {
     const pullRequestDetails = await getPullRequestDetails(octokit)
     const pathToProject = process.env.GITHUB_WORKSPACE
 
-    const userEnvVars = getUserEnvVariables()
-    const githubEnvFilePath = join(pathToProject, '.github', '.platformatic.env')
-    await writeFile(githubEnvFilePath, serializeEnvVariables(userEnvVars))
+    core.info('Merging environment variables')
+    const envFileName = core.getInput('platformatic_env_file') || '.env'
+    const envFilePath = join(pathToProject, envFileName)
+    await mergeEnvVariables(envFilePath)
 
     const archivePath = join(pathToProject, '..', 'project.tar')
     await archiveProject(pathToProject, archivePath)
