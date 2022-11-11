@@ -130,6 +130,7 @@ function serializeEnvVariables (envVars) {
 function parseEnvVariables (envVars) {
   const parsedEnvVars = {}
   for (const line of envVars.split('\n')) {
+    if (line === '') continue
     const [key, value] = line.split('=')
     parsedEnvVars[key] = value
   }
@@ -141,13 +142,16 @@ function createApplicationUrl (applicationDomain) {
 }
 
 async function mergeEnvVariables (envFilePath) {
+  const githubEnvVars = getGithubEnvVariables()
+
+  if (Object.keys(githubEnvVars).length === 0) return
+
   let userEnvVars = {}
   if (existsSync(envFilePath)) {
     const userEnvFile = await readFile(envFilePath, 'utf8')
     userEnvVars = parseEnvVariables(userEnvFile)
   }
 
-  const githubEnvVars = getGithubEnvVariables()
   const mergedEnvVars = { ...githubEnvVars, ...userEnvVars }
   await writeFile(envFilePath, serializeEnvVariables(mergedEnvVars))
 }
