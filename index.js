@@ -26,7 +26,9 @@ async function createBundle (apiKey, pullRequestDetails, codeChecksum) {
     method: 'POST',
     headers: {
       'x-platformatic-api-key': apiKey,
-      'Content-Type': 'application/json'
+      'content-type': 'application/json',
+      'accept-encoding': '*',
+      accept: 'application/json'
     },
 
     body: JSON.stringify({ codeChecksum, pullRequestDetails })
@@ -62,9 +64,10 @@ async function createDeployment (apiKey, bundleId) {
   const { statusCode, body } = await request(url, {
     method: 'POST',
     headers: {
-      authorization: `Bearer ${apiKey}`,
       'x-platformatic-api-key': apiKey,
-      'Content-Type': 'application/json'
+      'content-type': 'application/json',
+      'accept-encoding': '*',
+      accept: 'application/json'
     },
 
     body: JSON.stringify({ bundleId })
