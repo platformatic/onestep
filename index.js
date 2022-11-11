@@ -20,12 +20,12 @@ async function archiveProject (pathToProject, archivePath) {
 }
 
 async function createBundle (apiKey, pullRequestDetails, codeChecksum) {
-  const url = STEVE_SERVER_URL + '/api/bundles'
+  const url = STEVE_SERVER_URL + '/bundles'
 
   const { statusCode, body } = await request(url, {
     method: 'POST',
     headers: {
-      authorization: `Bearer ${apiKey}`,
+      'x-platformatic-api-key': apiKey,
       'Content-Type': 'application/json'
     },
 
@@ -57,12 +57,13 @@ async function uploadCodeArchive (uploadToken, fileData) {
 }
 
 async function createDeployment (apiKey, bundleId) {
-  const url = STEVE_SERVER_URL + '/api/deployments'
+  const url = STEVE_SERVER_URL + `/bundles/${bundleId}/deployment`
 
   const { statusCode, body } = await request(url, {
     method: 'POST',
     headers: {
       authorization: `Bearer ${apiKey}`,
+      'x-platformatic-api-key': apiKey,
       'Content-Type': 'application/json'
     },
 
