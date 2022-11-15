@@ -137,10 +137,6 @@ function parseEnvVariables (envVars) {
   return parsedEnvVars
 }
 
-function createApplicationUrl (applicationDomain) {
-  return `https://${applicationDomain}`
-}
-
 async function mergeEnvVariables (envFilePath) {
   const githubEnvVars = getGithubEnvVariables()
 
@@ -193,10 +189,9 @@ async function run () {
     await uploadCodeArchive(uploadToken, fileData)
     core.info('Project has been successfully uploaded')
 
-    const { domainName } = await createDeployment(platformaticApiKey, bundleId)
-    const applicationUrl = createApplicationUrl(domainName)
+    const { url } = await createDeployment(platformaticApiKey, bundleId)
     core.info('Application has been successfully created')
-    core.info('Application URL: ' + domainName)
+    core.info('Application URL: ' + url)
 
     // TODO: add prewarm request for application url
 
@@ -205,11 +200,11 @@ async function run () {
       issue_number: pullRequestDetails.prNumber,
       body: [
         '**Your application was successfully deployed!** :rocket:',
-        `Application url: ${applicationUrl}`
+        `Application url: ${url}`
       ].join('\n')
     })
 
-    core.setOutput('platformatic_app_url', applicationUrl)
+    core.setOutput('platformatic_app_url', url)
   } catch (error) {
     core.setFailed(error.message)
   }
