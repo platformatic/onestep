@@ -11,8 +11,8 @@ const tar = require('tar')
 const { request } = require('undici')
 
 // TODO: replace with static URLs when ready
-const STEVE_SERVER_URL = core.getInput('steve_server_url')
-const HARRY_SERVER_URL = core.getInput('harry_server_url')
+const STEVE_SERVER_URL = core.getInput('steve_server_url') || 'https://plt-steve.fly.dev'
+const HARRY_SERVER_URL = core.getInput('harry_server_url') || 'https://plt-harry.fly.dev'
 
 async function archiveProject (pathToProject, archivePath) {
   const options = { gzip: false, file: archivePath, cwd: pathToProject }
