@@ -14,6 +14,8 @@ const { request } = require('undici')
 const STEVE_SERVER_URL = core.getInput('steve_server_url') || 'https://plt-steve.fly.dev'
 const HARRY_SERVER_URL = core.getInput('harry_server_url') || 'https://plt-harry.fly.dev'
 
+const PLT_MESSAGE_REGEXP = /\*\*Your application was successfully deployed!\*\* :rocket:\nApplication url: (.*).*/
+
 async function archiveProject (pathToProject, archivePath) {
   const options = { gzip: false, file: archivePath, cwd: pathToProject }
   return tar.create(options, ['.'])
@@ -31,7 +33,20 @@ async function createBundle (apiKey, repository, pullRequestDetails, codeChecksu
       accept: 'application/json'
     },
 
-    body: JSON.stringify({ codeChecksum, repository, pullRequestDetails })
+    body: JSON.stringify({
+      codeChecksum,
+      repository,
+      pullRequestDetails: {
+        branch: pullRequestDetails.head.ref,
+        prTitle: pullRequestDetails.title,
+        prNumber: pullRequestDetails.number,
+        location: pullRequestDetails.head.repo.full_name,
+        commitHash: pullRequestDetails.head.sha,
+        commitUsername: pullRequestDetails.head.user.login,
+        additions: pullRequestDetails.additions,
+        deletions: pullRequestDetails.deletions
+      }
+    })
   })
 
   if (statusCode !== 200) {
@@ -90,22 +105,13 @@ async function getPullRequestDetails (octokit) {
     throw new Error('Action must be triggered by pull request')
   }
 
-  const pullRequestFullInfo = await octokit.rest.pulls.get({
+  const { data: pullRequestDetails } = await octokit.rest.pulls.get({
     owner: pullRequestInfo.base.repo.owner.login,
     repo: pullRequestInfo.base.repo.name,
     pull_number: pullRequestInfo.number
   })
 
-  return {
-    branch: pullRequestFullInfo.data.head.ref,
-    prTitle: pullRequestFullInfo.data.title,
-    prNumber: pullRequestFullInfo.data.number,
-    location: pullRequestFullInfo.data.head.repo.full_name,
-    commitHash: pullRequestFullInfo.data.head.sha,
-    commitUsername: pullRequestFullInfo.data.head.user.login,
-    additions: pullRequestFullInfo.data.additions,
-    deletions: pullRequestFullInfo.data.deletions
-  }
+  return pullRequestDetails
 }
 
 function getGithubEnvVariables () {
@@ -152,6 +158,67 @@ async function mergeEnvVariables (envFilePath) {
   await writeFile(envFilePath, serializeEnvVariables(mergedEnvVars))
 }
 
+async function findLastPlatformaticComment (octokit) {
+  const pullRequestInfo = github.context.payload.pull_request
+  if (pullRequestInfo === undefined) {
+    throw new Error('Action must be triggered by pull request')
+  }
+
+  const { data: comments } = await octokit.rest.issues.listComments({
+    owner: pullRequestInfo.base.repo.owner.login,
+    repo: pullRequestInfo.base.repo.name,
+    issue_number: pullRequestInfo.number
+  })
+
+  const platformaticComments = comments
+    .filter(comment =>
+      comment.user.login === 'github-actions[bot]' &&
+        PLT_MESSAGE_REGEXP.test(comment.body)
+    )
+    .sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at))
+
+  if (platformaticComments.length === 0) {
+    return null
+  }
+
+  const lastComment = platformaticComments[platformaticComments.length - 1]
+  return lastComment.id
+}
+
+function createPlatformaticComment (applicationUrl, commitHash, commitUrl) {
+  return [
+    '**Your application was successfully deployed!** :rocket:',
+    `Application url: ${applicationUrl}`,
+    `Built from the commit: [${commitHash.slice(0, 7)}](${commitUrl})`
+  ].join('\n')
+}
+
+async function postPlatformaticComment (octokit, comment) {
+  const pullRequestInfo = github.context.payload.pull_request
+  if (pullRequestInfo === undefined) {
+    throw new Error('Action must be triggered by pull request')
+  }
+
+  await octokit.rest.issues.createComment({
+    ...github.context.repo,
+    issue_number: pullRequestInfo.number,
+    body: comment
+  })
+}
+
+async function updatePlatformaticComment (octokit, commentId, comment) {
+  const pullRequestInfo = github.context.payload.pull_request
+  if (pullRequestInfo === undefined) {
+    throw new Error('Action must be triggered by pull request')
+  }
+
+  await octokit.rest.issues.updateComment({
+    ...github.context.repo,
+    comment_id: commentId,
+    body: comment
+  })
+}
+
 async function run () {
   try {
     const platformaticApiKey = core.getInput('platformatic_api_key')
@@ -195,14 +262,16 @@ async function run () {
 
     // TODO: add prewarm request for application url
 
-    await octokit.rest.issues.createComment({
-      ...github.context.repo,
-      issue_number: pullRequestDetails.prNumber,
-      body: [
-        '**Your application was successfully deployed!** :rocket:',
-        `Application url: ${url}`
-      ].join('\n')
-    })
+    const commitHash = pullRequestDetails.head.sha
+    const commitUrl = pullRequestDetails.head.repo.html_url + '/commit/' + commitHash
+    const platformaticComment = createPlatformaticComment(url, commitHash, commitUrl)
+
+    const lastCommentId = await findLastPlatformaticComment(octokit)
+    if (lastCommentId === null) {
+      await postPlatformaticComment(octokit, platformaticComment)
+    } else {
+      await updatePlatformaticComment(octokit, lastCommentId, platformaticComment)
+    }
 
     core.setOutput('platformatic_app_url', url)
   } catch (error) {
