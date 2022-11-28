@@ -21,7 +21,7 @@ async function archiveProject (pathToProject, archivePath) {
   return tar.create(options, ['.'])
 }
 
-async function createBundle (apiKey, repository, pullRequestDetails, codeChecksum) {
+async function createBundle (apiKey, repository, repositoryName, pullRequestDetails, codeChecksum) {
   const url = STEVE_SERVER_URL + '/bundles'
 
   const { statusCode, body } = await request(url, {
@@ -35,7 +35,10 @@ async function createBundle (apiKey, repository, pullRequestDetails, codeChecksu
 
     body: JSON.stringify({
       codeChecksum,
-      repository,
+      repository: {
+        url: repository,
+        name: repositoryName
+      },
       pullRequestDetails: {
         branch: pullRequestDetails.head.ref,
         prTitle: pullRequestDetails.title,
@@ -229,7 +232,6 @@ async function run () {
     const githubToken = core.getInput('github_token')
     const octokit = github.getOctokit(githubToken)
 
-    const repository = github.context.payload.repository.html_url
     const pullRequestDetails = await getPullRequestDetails(octokit)
     const pathToProject = process.env.GITHUB_WORKSPACE
 
@@ -245,9 +247,13 @@ async function run () {
     const fileData = await readFile(archivePath)
     const codeChecksum = generateMD5Hash(fileData)
 
+    const repository = github.context.payload.repository.html_url
+    const repositoryName = github.context.payload.repository.name
+
     const { bundleId, uploadToken } = await createBundle(
       platformaticApiKey,
       repository,
+      repositoryName,
       pullRequestDetails,
       codeChecksum
     )
