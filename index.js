@@ -3,7 +3,7 @@
 const { join } = require('path')
 const { createHash } = require('crypto')
 const { existsSync } = require('fs')
-const { readFile, writeFile } = require('fs/promises')
+const { readFile, writeFile, access } = require('fs/promises')
 
 const core = require('@actions/core')
 const github = require('@actions/github')
@@ -209,6 +209,25 @@ async function postPlatformaticComment (octokit, comment) {
   })
 }
 
+async function checkPlatformaticDependency (projectPath) {
+  const packageJsonPath = join(projectPath, 'package.json')
+
+  try {
+    await access(packageJsonPath)
+  } catch (err) {}
+
+  const packageJsonData = await readFile(packageJsonPath, 'utf8')
+  const packageJson = JSON.parse(packageJsonData)
+
+  const dependencies = packageJson.dependencies
+  if (
+    dependencies !== undefined &&
+    dependencies.platformatic !== undefined
+  ) {
+    core.warning('Move platformatic dependency to devDependencies to speed up deployment')
+  }
+}
+
 async function updatePlatformaticComment (octokit, commentId, comment) {
   const pullRequestInfo = github.context.payload.pull_request
   if (pullRequestInfo === undefined) {
@@ -234,6 +253,8 @@ async function run () {
 
     const pullRequestDetails = await getPullRequestDetails(octokit)
     const pathToProject = process.env.GITHUB_WORKSPACE
+
+    await checkPlatformaticDependency(pathToProject)
 
     core.info('Merging environment variables')
     const envFileName = core.getInput('platformatic_env_file') || '.env'
