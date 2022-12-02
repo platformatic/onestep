@@ -7,6 +7,12 @@ inputs:
   platformatic_api_key:
     description: 'Platformatic API key'
     required: true
+  platformatic_config_path:
+    description: 'Path to the Platformatic config file'
+    required: false
+  platformatic_env_path:
+    description: 'Path to the Platformatic config file'
+    required: false
   steve_server_url:
     description: 'Url to the Steve server (test parameter)'
     required: true

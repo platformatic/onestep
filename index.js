@@ -21,7 +21,7 @@ async function archiveProject (pathToProject, archivePath) {
   return tar.create(options, ['.'])
 }
 
-async function createBundle (apiKey, repository, repositoryName, pullRequestDetails, codeChecksum) {
+async function createBundle (apiKey, repository, repositoryName, pullRequestDetails, configPath, codeChecksum) {
   const url = STEVE_SERVER_URL + '/bundles'
 
   const { statusCode, body } = await request(url, {
@@ -34,6 +34,7 @@ async function createBundle (apiKey, repository, repositoryName, pullRequestDeta
     },
 
     body: JSON.stringify({
+      configPath,
       codeChecksum,
       repository: {
         url: repository,
@@ -196,6 +197,15 @@ function createPlatformaticComment (applicationUrl, commitHash, commitUrl) {
   ].join('\n')
 }
 
+async function isFileAccessible (path) {
+  try {
+    await access(path)
+    return true
+  } catch (err) {
+    return false
+  }
+}
+
 async function postPlatformaticComment (octokit, comment) {
   const pullRequestInfo = github.context.payload.pull_request
   if (pullRequestInfo === undefined) {
@@ -212,9 +222,8 @@ async function postPlatformaticComment (octokit, comment) {
 async function checkPlatformaticDependency (projectPath) {
   const packageJsonPath = join(projectPath, 'package.json')
 
-  try {
-    await access(packageJsonPath)
-  } catch (err) {}
+  const packageJsonExist = await isFileAccessible(packageJsonPath)
+  if (!packageJsonExist) return
 
   const packageJsonData = await readFile(packageJsonPath, 'utf8')
   const packageJson = JSON.parse(packageJsonData)
@@ -256,8 +265,16 @@ async function run () {
 
     await checkPlatformaticDependency(pathToProject)
 
+    const configPath = core.getInput('platformatic_config_path') || 'platformatic.service.json'
+    const configAbsolutePath = join(pathToProject, configPath)
+    const configFileExist = await isFileAccessible(configAbsolutePath)
+
+    if (!configFileExist) {
+      throw new Error('There is no Platformatic config file')
+    }
+
     core.info('Merging environment variables')
-    const envFileName = core.getInput('platformatic_env_file') || '.env'
+    const envFileName = core.getInput('platformatic_env_path') || '.env'
     const envFilePath = join(pathToProject, envFileName)
     await mergeEnvVariables(envFilePath)
 
@@ -276,6 +293,7 @@ async function run () {
       repository,
       repositoryName,
       pullRequestDetails,
+      configPath,
       codeChecksum
     )
 
