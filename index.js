@@ -15,13 +15,14 @@ const STEVE_SERVER_URL = core.getInput('steve_server_url') || 'https://plt-steve
 const HARRY_SERVER_URL = core.getInput('harry_server_url') || 'https://plt-harry.fly.dev'
 
 const PLT_MESSAGE_REGEXP = /\*\*Your application was successfully deployed!\*\* :rocket:\nApplication url: (.*).*/
+const APPLICATION_TYPES = ['service', 'db']
 
 async function archiveProject (pathToProject, archivePath) {
   const options = { gzip: false, file: archivePath, cwd: pathToProject }
   return tar.create(options, ['.'])
 }
 
-async function createBundle (apiKey, repository, repositoryName, pullRequestDetails, configPath, codeChecksum) {
+async function createBundle (apiKey, appType, repositoryUrl, repositoryName, pullRequestDetails, configPath, codeChecksum) {
   const url = STEVE_SERVER_URL + '/bundles'
 
   const { statusCode, body } = await request(url, {
@@ -34,10 +35,11 @@ async function createBundle (apiKey, repository, repositoryName, pullRequestDeta
     },
 
     body: JSON.stringify({
+      appType,
       configPath,
       codeChecksum,
       repository: {
-        url: repository,
+        url: repositoryUrl,
         name: repositoryName
       },
       pullRequestDetails: {
@@ -160,6 +162,14 @@ async function mergeEnvVariables (envFilePath) {
 
   const mergedEnvVars = { ...githubEnvVars, ...userEnvVars }
   await writeFile(envFilePath, serializeEnvVariables(mergedEnvVars))
+}
+
+function getApplicationType (configPath) {
+  const appType = configPath.split('.').slice(-2)[0]
+  if (!APPLICATION_TYPES.includes(appType)) {
+    throw new Error(`Invalid application type: ${appType}, must be one of: ${APPLICATION_TYPES.join(', ')}`)
+  }
+  return appType
 }
 
 async function findLastPlatformaticComment (octokit) {
@@ -288,8 +298,11 @@ async function run () {
     const repository = github.context.payload.repository.html_url
     const repositoryName = github.context.payload.repository.name
 
+    const appType = getApplicationType(configPath)
+
     const { bundleId, uploadToken } = await createBundle(
       platformaticApiKey,
+      appType,
       repository,
       repositoryName,
       pullRequestDetails,
