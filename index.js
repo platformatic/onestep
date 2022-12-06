@@ -19,6 +19,7 @@ const APPLICATION_TYPES = ['service', 'db']
 const CONFIG_FILE_EXTENSIONS = ['yml', 'yaml', 'json', 'json5', 'tml', 'toml']
 
 const PREWARM_REQUEST_TIMEOUT = 2 * 60 * 1000
+const PREWARM_REQUEST_ATTEMPTS = 5
 
 async function archiveProject (pathToProject, archivePath) {
   const options = { gzip: false, file: archivePath, cwd: pathToProject }
@@ -272,15 +273,23 @@ async function checkPlatformaticDependency (projectPath) {
   }
 }
 
-async function makePrewarmRequest (appUrl) {
-  const { statusCode, body } = await request(appUrl, {
-    method: 'GET',
-    headersTimeout: PREWARM_REQUEST_TIMEOUT
-  })
+async function makePrewarmRequest (appUrl, attempt = 1) {
+  try {
+    const { statusCode, body } = await request(appUrl, {
+      method: 'GET',
+      headersTimeout: PREWARM_REQUEST_TIMEOUT
+    })
 
-  if (statusCode !== 200) {
-    const error = await body.text()
-    throw new Error(`Could not make a prewarm call: ${statusCode} ${error}`)
+    if (statusCode !== 200) {
+      const error = await body.text()
+      throw new Error(`Could not make a prewarm call: ${statusCode} ${error}`)
+    }
+  } catch (error) {
+    if (attempt < PREWARM_REQUEST_ATTEMPTS) {
+      core.warning(`Could not make a prewarm call: ${error.message}, retrying...`)
+      return makePrewarmRequest(appUrl, attempt + 1)
+    }
+    throw error
   }
 }
 
