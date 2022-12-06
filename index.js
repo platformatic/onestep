@@ -17,6 +17,8 @@ const HARRY_SERVER_URL = core.getInput('harry_server_url') || 'https://plt-harry
 const PLT_MESSAGE_REGEXP = /\*\*Your application was successfully deployed!\*\* :rocket:\nApplication url: (.*).*/
 const APPLICATION_TYPES = ['service', 'db']
 
+const PREWARM_REQUEST_TIMEOUT = 2 * 60 * 1000
+
 async function archiveProject (pathToProject, archivePath) {
   const options = { gzip: false, file: archivePath, cwd: pathToProject }
   return tar.create(options, ['.'])
@@ -247,6 +249,18 @@ async function checkPlatformaticDependency (projectPath) {
   }
 }
 
+async function makePrewarmRequest (appUrl) {
+  const { statusCode, body } = await request(appUrl, {
+    method: 'GET',
+    headersTimeout: PREWARM_REQUEST_TIMEOUT
+  })
+
+  if (statusCode !== 200) {
+    const error = await body.text()
+    throw new Error(`Could not make a prewarm call: ${statusCode} ${error}`)
+  }
+}
+
 async function updatePlatformaticComment (octokit, commentId, comment) {
   const pullRequestInfo = github.context.payload.pull_request
   if (pullRequestInfo === undefined) {
@@ -318,7 +332,14 @@ async function run () {
     core.info('Application has been successfully created')
     core.info('Application URL: ' + url)
 
-    // TODO: add prewarm request for application url
+    try {
+      core.info('Making prewarm application call...')
+      await makePrewarmRequest(url)
+      core.info('Application has been successfully prewarmed')
+    } catch (error) {
+      core.error('Could not make a prewarm call')
+      core.setFailed(error.message)
+    }
 
     const commitHash = pullRequestDetails.head.sha
     const commitUrl = pullRequestDetails.head.repo.html_url + '/commit/' + commitHash
