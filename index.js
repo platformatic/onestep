@@ -1,9 +1,9 @@
 'use strict'
 
-const { join } = require('path')
+const { join, basename } = require('path')
 const { createHash } = require('crypto')
 const { existsSync } = require('fs')
-const { readFile, writeFile, access } = require('fs/promises')
+const { readFile, writeFile, access, readdir } = require('fs/promises')
 
 const core = require('@actions/core')
 const github = require('@actions/github')
@@ -16,6 +16,7 @@ const HARRY_SERVER_URL = core.getInput('harry_server_url') || 'https://plt-harry
 
 const PLT_MESSAGE_REGEXP = /\*\*Your application was successfully deployed!\*\* :rocket:\nApplication url: (.*).*/
 const APPLICATION_TYPES = ['service', 'db']
+const CONFIG_FILE_EXTENSIONS = ['yml', 'yaml', 'json', 'json5', 'tml', 'toml']
 
 const PREWARM_REQUEST_TIMEOUT = 2 * 60 * 1000
 
@@ -149,6 +150,28 @@ function parseEnvVariables (envVars) {
     parsedEnvVars[key] = value
   }
   return parsedEnvVars
+}
+
+async function findConfigFile (projectDir) {
+  const files = await readdir(projectDir)
+
+  for (const file of files) {
+    const filename = basename(file)
+    const filenameParts = filename.split('.')
+
+    if (filenameParts.length === 3) {
+      const [name, ext1, ext2] = filenameParts
+      if (
+        name === 'platformatic' &&
+        APPLICATION_TYPES.includes(ext1) &&
+        CONFIG_FILE_EXTENSIONS.includes(ext2)
+      ) {
+        return filename
+      }
+    }
+  }
+
+  return null
 }
 
 async function mergeEnvVariables (envFilePath) {
@@ -289,7 +312,17 @@ async function run () {
 
     await checkPlatformaticDependency(pathToProject)
 
-    const configPath = core.getInput('platformatic_config_path') || 'platformatic.service.json'
+    let configPath = core.getInput('platformatic_config_path')
+    if (!configPath) {
+      configPath = await findConfigFile(pathToProject)
+
+      if (configPath === null) {
+        throw new Error('Could not find Platformatic config file, please specify it in the action input')
+      } else {
+        core.info(`Found Platformatic config file: ${configPath}`)
+      }
+    }
+
     const configAbsolutePath = join(pathToProject, configPath)
     const configFileExist = await isFileAccessible(configAbsolutePath)
 
