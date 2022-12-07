@@ -60,6 +60,9 @@ async function createBundle (apiKey, appType, repositoryUrl, repositoryName, pul
   })
 
   if (statusCode !== 200) {
+    if (statusCode === 401) {
+      throw new Error('Invalid platformatic_api_key provided')
+    }
     throw new Error(`Could not create a bundle: ${statusCode}`)
   }
 
@@ -99,6 +102,9 @@ async function createDeployment (apiKey, bundleId) {
   })
 
   if (statusCode !== 200) {
+    if (statusCode === 401) {
+      throw new Error('Invalid platformatic_api_key provided')
+    }
     throw new Error(`Could not create a bundle: ${statusCode}`)
   }
 
