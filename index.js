@@ -21,6 +21,8 @@ const CONFIG_FILE_EXTENSIONS = ['yml', 'yaml', 'json', 'json5', 'tml', 'toml']
 const PREWARM_REQUEST_TIMEOUT = 2 * 60 * 1000
 const PREWARM_REQUEST_ATTEMPTS = 5
 
+const PLATFORMATIC_ENV_VARS = ['PORT', 'DATABASE_URL']
+
 async function archiveProject (pathToProject, archivePath) {
   const options = { gzip: false, file: archivePath, cwd: pathToProject }
   return tar.create(options, ['.'])
@@ -130,11 +132,20 @@ async function getPullRequestDetails (octokit) {
   return pullRequestDetails
 }
 
-function getGithubEnvVariables () {
+function getGithubEnvVariables (allowedEnvVars) {
+  const upperCaseAllowedEnvVars = []
+  for (const allowedEnvVar of allowedEnvVars) {
+    upperCaseAllowedEnvVars.push(allowedEnvVar.toUpperCase().trim())
+  }
+
   const userEnvVars = {}
   for (const key in process.env) {
-    const upperCaseKey = key.toUpperCase()
-    if (upperCaseKey.startsWith('PLT_')) {
+    const upperCaseKey = key.toUpperCase().trim()
+    if (
+      PLATFORMATIC_ENV_VARS.includes(upperCaseKey) ||
+      upperCaseAllowedEnvVars.includes(upperCaseKey) ||
+      upperCaseKey.startsWith('PLT_')
+    ) {
       userEnvVars[upperCaseKey] = process.env[key]
     }
   }
@@ -181,9 +192,7 @@ async function findConfigFile (projectDir) {
   return null
 }
 
-async function mergeEnvVariables (envFilePath) {
-  const githubEnvVars = getGithubEnvVariables()
-
+async function mergeEnvVariables (envFilePath, githubEnvVars) {
   if (Object.keys(githubEnvVars).length === 0) return
 
   let userEnvVars = {}
@@ -346,9 +355,13 @@ async function run () {
     }
 
     core.info('Merging environment variables')
+    const allowedEnvVarParam = core.getInput('allowed_env_vars') || ''
+    const allowedEnvVar = allowedEnvVarParam.split(',')
+    const githubEnvVars = getGithubEnvVariables(allowedEnvVar)
+
     const envFileName = core.getInput('platformatic_env_path') || '.env'
     const envFilePath = join(pathToProject, envFileName)
-    await mergeEnvVariables(envFilePath)
+    await mergeEnvVariables(envFilePath, githubEnvVars)
 
     const archivePath = join(pathToProject, '..', 'project.tar')
     await archiveProject(pathToProject, archivePath)

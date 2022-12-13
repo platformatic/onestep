@@ -13,6 +13,9 @@ inputs:
   platformatic_env_path:
     description: 'Path to the Platformatic config file'
     required: false
+  allowed_env_vars:
+    description: 'Comma separated list of environment variables to be passed to the Platformatic DB application'
+    required: false
   steve_server_url:
     description: 'Url to the Steve server (test parameter)'
     required: true
