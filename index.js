@@ -359,12 +359,15 @@ async function installPlatformaticDependency (version) {
 
 async function getPackagePath (pathToProject, packageName) {
   const latestPackageVersion = await getLatestPackageVersion(packageName)
+  core.info(`Latest version of ${packageName} is ${latestPackageVersion}`)
 
   const localPackagePath = join(pathToProject, 'node_modules', packageName)
   const localPackageInstalled = await isFileAccessible(localPackagePath)
 
   if (localPackageInstalled) {
     const localPackageVersion = await getPackageVersion(localPackagePath)
+    core.info(`Local version of ${packageName} is ${localPackageVersion}`)
+
     if (localPackageVersion === latestPackageVersion) return localPackagePath
   }
 
