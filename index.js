@@ -28,7 +28,16 @@ async function archiveProject (pathToProject, archivePath) {
   return tar.create(options, ['.'])
 }
 
-async function createBundle (apiKey, appType, repositoryUrl, repositoryName, pullRequestDetails, configPath, codeChecksum) {
+async function createBundle (
+  apiKey,
+  appType,
+  repositoryUrl,
+  repositoryName,
+  pullRequestDetails,
+  configPath,
+  rawConfig,
+  codeChecksum
+) {
   const url = STEVE_SERVER_URL + '/bundles'
 
   const { statusCode, body } = await request(url, {
@@ -57,6 +66,9 @@ async function createBundle (apiKey, appType, repositoryUrl, repositoryName, pul
         commitUsername: pullRequestDetails.head.user.login,
         additions: pullRequestDetails.additions,
         deletions: pullRequestDetails.deletions
+      },
+      config: {
+        raw: rawConfig
       }
     })
   })
@@ -448,6 +460,11 @@ async function run () {
     })
     await configManager.parseAndValidate()
 
+    const config = configManager.current
+    core.info(JSON.stringify(config, null, 2))
+
+    const rawConfig = await readFile(configAbsolutePath, 'utf8')
+
     const archivePath = join(pathToProject, '..', 'project.tar')
     await archiveProject(pathToProject, archivePath)
     core.info('Project has been successfully archived')
@@ -465,6 +482,7 @@ async function run () {
       repositoryName,
       pullRequestDetails,
       configPath,
+      rawConfig,
       codeChecksum
     )
 
