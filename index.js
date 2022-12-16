@@ -487,22 +487,22 @@ async function run () {
       codeChecksum
     )
 
-    core.info('Uploading code archive to the cloud...')
-    await uploadCodeArchive(uploadToken, fileData)
-    core.info('Project has been successfully uploaded')
+    // core.info('Uploading code archive to the cloud...')
+    // await uploadCodeArchive(uploadToken, fileData)
+    // core.info('Project has been successfully uploaded')
 
     const { url } = await createDeployment(platformaticApiKey, bundleId)
     core.info('Application has been successfully created')
     core.info('Application URL: ' + url)
 
-    try {
-      core.info('Making prewarm application call...')
-      await makePrewarmRequest(url)
-      core.info('Application has been successfully prewarmed')
-    } catch (error) {
-      core.error('Could not make a prewarm call')
-      core.setFailed(error.message)
-    }
+    // try {
+    //   core.info('Making prewarm application call...')
+    //   await makePrewarmRequest(url)
+    //   core.info('Application has been successfully prewarmed')
+    // } catch (error) {
+    //   core.error('Could not make a prewarm call')
+    //   core.setFailed(error.message)
+    // }
 
     const commitHash = pullRequestDetails.head.sha
     const commitUrl = pullRequestDetails.head.repo.html_url + '/commit/' + commitHash
