@@ -1,9 +1,10 @@
 'use strict'
 
-const { join, basename } = require('path')
+const { join, basename, extname } = require('path')
 const { createHash } = require('crypto')
 const { existsSync } = require('fs')
 const { readFile, writeFile, access, readdir } = require('fs/promises')
+const { exec } = require('child_process')
 
 const core = require('@actions/core')
 const github = require('@actions/github')
@@ -27,7 +28,17 @@ async function archiveProject (pathToProject, archivePath) {
   return tar.create(options, ['.'])
 }
 
-async function createBundle (apiKey, appType, repositoryUrl, repositoryName, pullRequestDetails, configPath, codeChecksum) {
+async function createBundle (
+  apiKey,
+  appType,
+  repositoryUrl,
+  repositoryName,
+  pullRequestDetails,
+  configPath,
+  rawConfig,
+  configFormat,
+  codeChecksum
+) {
   const url = STEVE_SERVER_URL + '/bundles'
 
   const { statusCode, body } = await request(url, {
@@ -56,6 +67,10 @@ async function createBundle (apiKey, appType, repositoryUrl, repositoryName, pul
         commitUsername: pullRequestDetails.head.user.login,
         additions: pullRequestDetails.additions,
         deletions: pullRequestDetails.deletions
+      },
+      config: {
+        raw: rawConfig,
+        format: configFormat
       }
     })
   })
@@ -191,17 +206,16 @@ async function findConfigFile (projectDir) {
   return null
 }
 
-async function mergeEnvVariables (envFilePath, githubEnvVars) {
-  if (Object.keys(githubEnvVars).length === 0) return
-
-  let userEnvVars = {}
+async function getApplicationEnvVariables (envFilePath) {
   if (existsSync(envFilePath)) {
     const userEnvFile = await readFile(envFilePath, 'utf8')
-    userEnvVars = parseEnvVariables(userEnvFile)
+    return parseEnvVariables(userEnvFile)
   }
+  return {}
+}
 
-  const mergedEnvVars = { ...githubEnvVars, ...userEnvVars }
-  await writeFile(envFilePath, serializeEnvVariables(mergedEnvVars))
+function mergeEnvVariables (githubEnvVars, appEnvVars) {
+  return { ...githubEnvVars, ...appEnvVars }
 }
 
 function getApplicationType (configPath) {
@@ -269,24 +283,6 @@ async function postPlatformaticComment (octokit, comment) {
   })
 }
 
-async function checkPlatformaticDependency (projectPath) {
-  const packageJsonPath = join(projectPath, 'package.json')
-
-  const packageJsonExist = await isFileAccessible(packageJsonPath)
-  if (!packageJsonExist) return
-
-  const packageJsonData = await readFile(packageJsonPath, 'utf8')
-  const packageJson = JSON.parse(packageJsonData)
-
-  const dependencies = packageJson.dependencies
-  if (
-    dependencies !== undefined &&
-    dependencies.platformatic !== undefined
-  ) {
-    core.warning('Move platformatic dependency to devDependencies to speed up deployment')
-  }
-}
-
 async function makePrewarmRequest (appUrl, attempt = 1) {
   try {
     const { statusCode, body } = await request(appUrl, {
@@ -318,6 +314,90 @@ async function updatePlatformaticComment (octokit, commentId, comment) {
     comment_id: commentId,
     body: comment
   })
+}
+
+function getApplicationPackageName (appType) {
+  return `@platformatic/${appType}`
+}
+
+async function checkPlatformaticDependency (projectPath) {
+  const packageJsonPath = join(projectPath, 'package.json')
+
+  const packageJsonExist = await isFileAccessible(packageJsonPath)
+  if (!packageJsonExist) return
+
+  const packageJsonData = await readFile(packageJsonPath, 'utf8')
+  const packageJson = JSON.parse(packageJsonData)
+
+  const dependencies = packageJson.dependencies
+  if (
+    dependencies !== undefined &&
+    dependencies.platformatic !== undefined
+  ) {
+    core.warning('Move platformatic dependency to devDependencies to speed up deployment')
+  }
+}
+
+async function getLatestPackageVersion (packageName) {
+  const { statusCode, body } = await request(
+    `https://registry.npmjs.org/${packageName}`,
+    {
+      method: 'GET'
+    }
+  )
+
+  if (statusCode !== 200) {
+    const error = body.text()
+    throw new Error(`Cannot get latest version of platformatic package ${statusCode} ${error}`)
+  }
+
+  const packageInfo = await body.json()
+  return packageInfo['dist-tags'].latest
+}
+
+async function installPackage (packageName, version) {
+  return new Promise((resolve, reject) => {
+    core.info(`Installing ${packageName}@v${version} package...`)
+    exec(`npm install ${packageName}@v${version}`, { cwd: __dirname }, (error) => {
+      if (error) {
+        core.info('Failed to install platformatic dependency')
+        reject(error)
+      } else {
+        core.info('Successfully installed platformatic dependency')
+        resolve()
+      }
+    })
+  })
+}
+
+async function getPackagePath (pathToProject, packageName) {
+  const latestPackageVersion = await getLatestPackageVersion(packageName)
+  core.info(`Latest version of ${packageName} is ${latestPackageVersion}`)
+
+  const localPackagePath = join(pathToProject, 'node_modules', packageName)
+  const localPackageInstalled = await isFileAccessible(localPackagePath)
+
+  if (localPackageInstalled) {
+    const localPackageVersion = await getPackageVersion(localPackagePath)
+    core.info(`Local version of ${packageName} is ${localPackageVersion}`)
+
+    if (localPackageVersion === latestPackageVersion) {
+      return localPackagePath
+    } else {
+      core.warning('In our beta phase, we only support using the latest release of Platformatic')
+    }
+  }
+
+  await installPackage(packageName, latestPackageVersion)
+  return join(__dirname, 'node_modules', packageName)
+}
+
+async function getPackageVersion (pathToPackage) {
+  const packageJsonPath = join(pathToPackage, 'package.json')
+  const packageJsonData = await readFile(packageJsonPath, 'utf8')
+
+  const packageJson = JSON.parse(packageJsonData)
+  return packageJson.version
 }
 
 async function run () {
@@ -353,14 +433,40 @@ async function run () {
       throw new Error('There is no Platformatic config file')
     }
 
-    core.info('Merging environment variables')
+    core.info('Parsing github env variables')
     const allowedEnvVarParam = core.getInput('allowed_env_vars') || ''
     const allowedEnvVar = allowedEnvVarParam.split(',')
     const githubEnvVars = getGithubEnvVariables(allowedEnvVar)
 
+    core.info('Parsing application env variables')
     const envFileName = core.getInput('platformatic_env_path') || '.env'
     const envFilePath = join(pathToProject, envFileName)
-    await mergeEnvVariables(envFilePath, githubEnvVars)
+    const appEnvVars = await getApplicationEnvVariables(envFilePath)
+
+    core.info('Merging env variables')
+    const mergedEnvVars = mergeEnvVariables(githubEnvVars, appEnvVars)
+    await writeFile(envFilePath, serializeEnvVariables(mergedEnvVars))
+
+    const appType = getApplicationType(configPath)
+    core.info('Application type: ' + appType)
+
+    const packageName = getApplicationPackageName(appType)
+    const pathToPackage = await getPackagePath(pathToProject, packageName)
+
+    const { ConfigManager } = require(pathToPackage)
+
+    core.info('Validating Platformatic config file')
+    const configManager = new ConfigManager({
+      source: configAbsolutePath,
+      env: mergedEnvVars
+    })
+    await configManager.parseAndValidate()
+
+    const config = configManager.current
+    core.info(JSON.stringify(config, null, 2))
+
+    const configFormat = extname(configPath).slice(1)
+    const rawConfig = await readFile(configAbsolutePath, 'utf8')
 
     const archivePath = join(pathToProject, '..', 'project.tar')
     await archiveProject(pathToProject, archivePath)
@@ -372,8 +478,6 @@ async function run () {
     const repository = github.context.payload.repository.html_url
     const repositoryName = github.context.payload.repository.name
 
-    const appType = getApplicationType(configPath)
-
     const { bundleId, uploadToken } = await createBundle(
       platformaticApiKey,
       appType,
@@ -381,6 +485,8 @@ async function run () {
       repositoryName,
       pullRequestDetails,
       configPath,
+      rawConfig,
+      configFormat,
       codeChecksum
     )
 
