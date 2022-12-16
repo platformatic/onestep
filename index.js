@@ -368,7 +368,11 @@ async function getPackagePath (pathToProject, packageName) {
     const localPackageVersion = await getPackageVersion(localPackagePath)
     core.info(`Local version of ${packageName} is ${localPackageVersion}`)
 
-    if (localPackageVersion === latestPackageVersion) return localPackagePath
+    if (localPackageVersion === latestPackageVersion) {
+      return localPackagePath
+    } else {
+      core.warning('In our beta phase, we only support using the latest release of Platformatic')
+    }
   }
 
   await installPackage(packageName, latestPackageVersion)
