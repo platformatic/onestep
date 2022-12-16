@@ -12,7 +12,7 @@ const tar = require('tar')
 const { request } = require('undici')
 
 // TODO: replace with static URLs when ready
-const STEVE_SERVER_URL = core.getInput('steve_server_url') || 'https://plt-steve.fly.dev'
+const STEVE_SERVER_URL = core.getInput('steve_server_url') || 'https://2777-109-104-175-199.eu.ngrok.io'
 const HARRY_SERVER_URL = core.getInput('harry_server_url') || 'https://plt-harry.fly.dev'
 
 const PLT_MESSAGE_REGEXP = /\*\*Your application was successfully deployed!\*\* :rocket:\nApplication url: (.*).*/
@@ -29,7 +29,16 @@ async function archiveProject (pathToProject, archivePath) {
   return tar.create(options, ['.'])
 }
 
-async function createBundle (apiKey, appType, repositoryUrl, repositoryName, pullRequestDetails, configPath, codeChecksum) {
+async function createBundle (
+  apiKey,
+  appType,
+  repositoryUrl,
+  repositoryName,
+  pullRequestDetails,
+  configPath,
+  rawConfig,
+  codeChecksum
+) {
   const url = STEVE_SERVER_URL + '/bundles'
 
   const { statusCode, body } = await request(url, {
@@ -58,6 +67,9 @@ async function createBundle (apiKey, appType, repositoryUrl, repositoryName, pul
         commitUsername: pullRequestDetails.head.user.login,
         additions: pullRequestDetails.additions,
         deletions: pullRequestDetails.deletions
+      },
+      config: {
+        raw: rawConfig
       }
     })
   })
@@ -449,6 +461,11 @@ async function run () {
     })
     await configManager.parseAndValidate()
 
+    const config = configManager.current
+    core.info(JSON.stringify(config, null, 2))
+
+    const rawConfig = await readFile(configAbsolutePath, 'utf8')
+
     const archivePath = join(pathToProject, '..', 'project.tar')
     await archiveProject(pathToProject, archivePath)
     core.info('Project has been successfully archived')
@@ -466,6 +483,7 @@ async function run () {
       repositoryName,
       pullRequestDetails,
       configPath,
+      rawConfig,
       codeChecksum
     )
 
