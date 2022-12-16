@@ -10,9 +10,8 @@ const github = require('@actions/github')
 const tar = require('tar')
 const { request } = require('undici')
 
-// TODO: replace with static URLs when ready
-const STEVE_SERVER_URL = core.getInput('steve_server_url') || 'https://plt-steve.fly.dev'
-const HARRY_SERVER_URL = core.getInput('harry_server_url') || 'https://plt-harry.fly.dev'
+const STEVE_SERVER_URL = 'https://plt-steve.fly.dev'
+const HARRY_SERVER_URL = 'https://plt-harry.fly.dev'
 
 const PLT_MESSAGE_REGEXP = /\*\*Your application was successfully deployed!\*\* :rocket:\nApplication url: (.*).*/
 const APPLICATION_TYPES = ['service', 'db']
