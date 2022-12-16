@@ -341,10 +341,10 @@ async function getLatestPackageVersion (packageName) {
   return packageInfo['dist-tags'].latest
 }
 
-async function installPlatformaticDependency (version) {
+async function installPackage (packageName, version) {
   return new Promise((resolve, reject) => {
-    core.info('Installing platformatic dependency...')
-    exec(`npm install platformatic@v${version}`, { cwd: __dirname }, (error) => {
+    core.info(`Installing ${packageName}@v${version} package...`)
+    exec(`npm install ${packageName}@v${version}`, { cwd: __dirname }, (error) => {
       if (error) {
         core.info('Failed to install platformatic dependency')
         reject(error)
@@ -370,7 +370,7 @@ async function getPackagePath (pathToProject, packageName) {
     if (localPackageVersion === latestPackageVersion) return localPackagePath
   }
 
-  await installPlatformaticDependency(latestPackageVersion)
+  await installPackage(packageName, latestPackageVersion)
   return join(__dirname, 'node_modules', packageName)
 }
 
