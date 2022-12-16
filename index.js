@@ -1,6 +1,6 @@
 'use strict'
 
-const { join, basename } = require('path')
+const { join, basename, extname } = require('path')
 const { createHash } = require('crypto')
 const { existsSync } = require('fs')
 const { readFile, writeFile, access, readdir } = require('fs/promises')
@@ -36,6 +36,7 @@ async function createBundle (
   pullRequestDetails,
   configPath,
   rawConfig,
+  configFormat,
   codeChecksum
 ) {
   const url = STEVE_SERVER_URL + '/bundles'
@@ -68,7 +69,8 @@ async function createBundle (
         deletions: pullRequestDetails.deletions
       },
       config: {
-        raw: rawConfig
+        raw: rawConfig,
+        format: configFormat
       }
     })
   })
@@ -463,6 +465,7 @@ async function run () {
     const config = configManager.current
     core.info(JSON.stringify(config, null, 2))
 
+    const configFormat = extname(configPath).slice(1)
     const rawConfig = await readFile(configAbsolutePath, 'utf8')
 
     const archivePath = join(pathToProject, '..', 'project.tar')
@@ -483,6 +486,7 @@ async function run () {
       pullRequestDetails,
       configPath,
       rawConfig,
+      configFormat,
       codeChecksum
     )
 
