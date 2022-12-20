@@ -56,3 +56,16 @@ test('prewarm throws error when all retries attempted', async (t) => {
   )
   mockAgent.assertNoPendingInterceptors()
 })
+
+test('prewarm successful on 302', async (t) => {
+  const svc = 'https://name-name-name-name.deploy.space'
+  const warmMe = mockAgent.get(svc)
+  warmMe.intercept({
+    path: '/',
+    method: 'GET'
+  }).reply(302, {})
+
+  await makePrewarmRequest(svc)
+
+  mockAgent.assertNoPendingInterceptors()
+})
