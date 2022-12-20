@@ -373,7 +373,7 @@ async function run () {
 
     try {
       core.info('Making prewarm application call...')
-      await makePrewarmRequest(`${url}/dashboard`)
+      await makePrewarmRequest(url)
       core.info('Application has been successfully prewarmed')
     } catch (error) {
       core.error('Could not make a prewarm call')
