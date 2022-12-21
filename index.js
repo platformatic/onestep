@@ -10,15 +10,14 @@ const github = require('@actions/github')
 const tar = require('tar')
 const { request } = require('undici')
 
+const makePrewarmRequest = require('./lib/prewarm.js')
+
 const STEVE_SERVER_URL = 'https://plt-steve.fly.dev'
 const HARRY_SERVER_URL = 'https://plt-harry.fly.dev'
 
 const PLT_MESSAGE_REGEXP = /\*\*Your application was successfully deployed!\*\* :rocket:\nApplication url: (.*).*/
 const APPLICATION_TYPES = ['service', 'db']
 const CONFIG_FILE_EXTENSIONS = ['yml', 'yaml', 'json', 'json5', 'tml', 'toml']
-
-const PREWARM_REQUEST_TIMEOUT = 2 * 60 * 1000
-const PREWARM_REQUEST_ATTEMPTS = 5
 
 const PLATFORMATIC_ENV_VARS = ['PORT', 'DATABASE_URL']
 
@@ -284,26 +283,6 @@ async function checkPlatformaticDependency (projectPath) {
     dependencies.platformatic !== undefined
   ) {
     core.warning('Move platformatic dependency to devDependencies to speed up deployment')
-  }
-}
-
-async function makePrewarmRequest (appUrl, attempt = 1) {
-  try {
-    const { statusCode, body } = await request(appUrl, {
-      method: 'GET',
-      headersTimeout: PREWARM_REQUEST_TIMEOUT
-    })
-
-    if (statusCode !== 200) {
-      const error = await body.text()
-      throw new Error(`Could not make a prewarm call: ${statusCode} ${error}`)
-    }
-  } catch (error) {
-    if (attempt < PREWARM_REQUEST_ATTEMPTS) {
-      core.warning(`Could not make a prewarm call: ${error.message}, retrying...`)
-      return makePrewarmRequest(appUrl, attempt + 1)
-    }
-    throw error
   }
 }
 
