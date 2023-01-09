@@ -1,6 +1,6 @@
 'use strict'
 
-const { join, basename } = require('path')
+const { join, basename, dirname } = require('path')
 const { createHash } = require('crypto')
 const { existsSync } = require('fs')
 const { readFile, writeFile, access, readdir } = require('fs/promises')
@@ -302,13 +302,11 @@ async function run () {
     const octokit = github.getOctokit(githubToken)
 
     const pullRequestDetails = await getPullRequestDetails(octokit)
-    const pathToProject = process.env.GITHUB_WORKSPACE
-
-    await checkPlatformaticDependency(pathToProject)
+    const pathToRepo = process.env.GITHUB_WORKSPACE
 
     let configPath = core.getInput('platformatic_config_path')
     if (!configPath) {
-      configPath = await findConfigFile(pathToProject)
+      configPath = await findConfigFile(pathToRepo)
 
       if (configPath === null) {
         throw new Error('Could not find Platformatic config file, please specify it in the action input')
@@ -319,23 +317,26 @@ async function run () {
 
     const appType = getApplicationType(configPath)
 
-    const configAbsolutePath = join(pathToProject, configPath)
+    const configAbsolutePath = join(pathToRepo, configPath)
     const configFileExist = await isFileAccessible(configAbsolutePath)
 
     if (!configFileExist) {
       throw new Error('There is no Platformatic config file')
     }
 
+    const pathToProject = dirname(configAbsolutePath)
+    await checkPlatformaticDependency(pathToProject)
+
     core.info('Merging environment variables')
     const allowedEnvVarParam = core.getInput('allowed_env_vars') || ''
     const allowedEnvVar = allowedEnvVarParam.split(',')
     const githubEnvVars = getGithubEnvVariables(allowedEnvVar)
 
-    const envFileName = core.getInput('platformatic_env_path') || '.env'
-    const envFilePath = join(pathToProject, envFileName)
-    await mergeEnvVariables(envFilePath, githubEnvVars)
+    const envFilePath = core.getInput('platformatic_env_path') || '.env'
+    const envFileAbsolutePath = join(pathToRepo, envFilePath)
+    await mergeEnvVariables(envFileAbsolutePath, githubEnvVars)
 
-    const archivePath = join(pathToProject, '..', 'project.tar')
+    const archivePath = join(pathToRepo, '..', 'project.tar')
     await archiveProject(pathToProject, archivePath)
     core.info('Project has been successfully archived')
 
