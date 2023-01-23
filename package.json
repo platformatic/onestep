@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "tap tests/*.test.js"
+    "lint": "standard .",
+    "test": "npm run lint && tap -j1 tests/*.test.js"
   },
   "repository": {
     "type": "git",
@@ -17,12 +18,16 @@
   },
   "homepage": "https://github.com/platformatic/deployer-action#readme",
   "devDependencies": {
+    "execa": "^6.1.0",
+    "fastify": "^4.11.0",
+    "nock": "^13.3.0",
     "standard": "^17.0.0",
     "tap": "^16.3.2"
   },
   "dependencies": {
     "@actions/core": "^1.10.0",
     "@actions/github": "^5.1.1",
+    "dotenv": "^16.0.3",
     "tar": "^6.1.11",
     "undici": "^5.11.0"
   }
