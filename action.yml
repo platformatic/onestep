@@ -8,10 +8,10 @@ inputs:
     description: 'Platformatic API key'
     required: true
   platformatic_config_path:
-    description: 'Path to the Platformatic config file'
+    description: 'Path to the Platformatic config file. The config file should be at the root of the Platformatic project.'
     required: false
   platformatic_env_path:
-    description: 'Path to the Platformatic config file'
+    description: 'Path to the Platformatic .env file'
     required: false
   allowed_env_vars:
     description: 'Comma separated list of environment variables to be passed to the Platformatic DB application'
