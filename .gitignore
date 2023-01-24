@@ -1,3 +1,6 @@
 *.swp
 .nyc_output
+node_modules/.cache
+
+# Comment next line if you want to add a new prod dependency
 node_modules
