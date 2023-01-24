@@ -9,7 +9,7 @@ const core = require('@actions/core')
 const github = require('@actions/github')
 const tar = require('tar')
 const { request } = require('undici')
-require('dotenv').config()
+require('dotenv').config({ path: join(__dirname, '.env') })
 
 const makePrewarmRequest = require('./lib/prewarm.js')
 
