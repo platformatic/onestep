@@ -354,3 +354,60 @@ test('action should fail if config file has wrong ext', async (t) => {
     t.equal(lastLine, '::error::Invalid application type: wrong, must be one of: service, db')
   }
 })
+
+test('action should deploy an empty project', async (t) => {
+  t.plan(4)
+
+  await startControlPanel(
+    t,
+    {
+      createBundleCallback: () => {
+        t.pass('Action should create a bundle')
+      },
+      createDeploymentCallback: () => {
+        t.pass('Action should create a deployment')
+      }
+    }
+  )
+
+  await startHarry(t, () => {
+    t.pass('Action should upload code to harry')
+  })
+
+  await startMachine(t, () => {
+    t.pass('Action should make a prewarm request to the machine')
+  })
+
+  await execaNode('execute.js', ['empty'], { cwd: __dirname })
+})
+
+test('action should deploy a project from a subfolder', async (t) => {
+  t.plan(4)
+
+  await startControlPanel(
+    t,
+    {
+      createBundleCallback: () => {
+        t.pass('Action should create a bundle')
+      },
+      createDeploymentCallback: () => {
+        t.pass('Action should create a deployment')
+      }
+    }
+  )
+
+  await startHarry(t, () => {
+    t.pass('Action should upload code to harry')
+  })
+
+  await startMachine(t, () => {
+    t.pass('Action should make a prewarm request to the machine')
+  })
+
+  await execaNode('execute.js', ['subfolder'], {
+    cwd: __dirname,
+    env: {
+      INPUT_PLATFORMATIC_CONFIG_PATH: './subfolder1/platformatic.db.json'
+    }
+  })
+})
