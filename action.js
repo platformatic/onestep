@@ -13,11 +13,8 @@ require('dotenv').config({ path: join(__dirname, '.env') })
 
 const makePrewarmRequest = require('./lib/prewarm.js')
 
-// const STEVE_SERVER_URL = process.env.STEVE_SERVER_URL
-// const HARRY_SERVER_URL = process.env.HARRY_SERVER_URL
-
-const STEVE_SERVER_URL = core.getInput('steve_server_url')
-const HARRY_SERVER_URL = core.getInput('harry_server_url')
+const STEVE_SERVER_URL = core.getInput('steve_server_url') || process.env.STEVE_SERVER_URL
+const HARRY_SERVER_URL = core.getInput('harry_server_url') || process.env.HARRY_SERVER_URL
 
 const PLT_MESSAGE_REGEXP = /\*\*Your application was successfully deployed!\*\* :rocket:\nApplication url: (.*).*/
 const APPLICATION_TYPES = ['service', 'db']
@@ -39,7 +36,7 @@ async function createBundle (
   configPath,
   codeChecksum
 ) {
-  const url = STEVE_SERVER_URL + '/bundles'
+  const url = STEVE_SERVER_URL + '/compendium/bundles'
 
   const { statusCode, body } = await request(url, {
     method: 'POST',
@@ -106,7 +103,7 @@ async function uploadCodeArchive (uploadToken, fileData) {
 }
 
 async function createDeployment (workspaceKey, bundleId, entryPointId) {
-  const url = STEVE_SERVER_URL + `/bundles/${bundleId}/deployment`
+  const url = STEVE_SERVER_URL + `/compendium/bundles/${bundleId}/deployment`
 
   const { statusCode, body } = await request(url, {
     method: 'POST',
