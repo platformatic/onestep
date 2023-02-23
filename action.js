@@ -36,7 +36,7 @@ async function createBundle (
   configPath,
   codeChecksum
 ) {
-  const url = STEVE_SERVER_URL + '/compendium/bundles'
+  const url = STEVE_SERVER_URL + '/bundles'
 
   const { statusCode, body } = await request(url, {
     method: 'POST',
@@ -103,7 +103,7 @@ async function uploadCodeArchive (uploadToken, fileData) {
 }
 
 async function createDeployment (workspaceKey, bundleId, entryPointId) {
-  const url = STEVE_SERVER_URL + `/compendium/bundles/${bundleId}/deployment`
+  const url = STEVE_SERVER_URL + `/bundles/${bundleId}/deployment`
 
   const { statusCode, body } = await request(url, {
     method: 'POST',
