@@ -41,6 +41,7 @@ async function createBundle (
   const { statusCode, body } = await request(url, {
     method: 'POST',
     headers: {
+      'x-platformatic-workspace-id': workspaceId,
       'x-platformatic-api-key': workspaceKey,
       'content-type': 'application/json',
       'accept-encoding': '*',
@@ -102,12 +103,18 @@ async function uploadCodeArchive (uploadToken, fileData) {
   }
 }
 
-async function createDeployment (workspaceKey, bundleId, entryPointId) {
+async function createDeployment (
+  workspaceId,
+  workspaceKey,
+  bundleId,
+  entryPointId
+) {
   const url = STEVE_SERVER_URL + `/bundles/${bundleId}/deployment`
 
   const { statusCode, body } = await request(url, {
     method: 'POST',
     headers: {
+      'x-platformatic-workspace-id': workspaceId,
       'x-platformatic-api-key': workspaceKey,
       'content-type': 'application/json',
       'accept-encoding': '*',
@@ -413,7 +420,7 @@ async function run () {
     await uploadCodeArchive(uploadToken, fileData)
     core.info('Project has been successfully uploaded')
 
-    await createDeployment(workspaceKey, bundleId, entryPointId)
+    await createDeployment(workspaceId, workspaceKey, bundleId, entryPointId)
     core.info('Application has been successfully created')
     core.info('Application URL: ' + entryPointUrl)
 
