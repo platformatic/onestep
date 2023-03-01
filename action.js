@@ -51,7 +51,6 @@ async function createBundle (
       label,
       bundle: {
         appType,
-        workspaceId,
         configPath,
         codeChecksum
       },
