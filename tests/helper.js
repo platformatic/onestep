@@ -56,12 +56,15 @@ function startGithubApi (owner, repositoryName, prNumber, prTitle) {
       head: {
         sha: '1234',
         ref: 'test',
-        repo: {
-          full_name: `${owner}/${repositoryName}`,
-          html_url: `https://github.com/${owner}/${repositoryName}`
-        },
         user: {
           login: owner
+        }
+      },
+      base: {
+        repo: {
+          id: 1234,
+          name: repositoryName,
+          html_url: `https://github.com/${owner}/${repositoryName}`
         }
       },
       title: prTitle,
@@ -80,45 +83,48 @@ async function startControlPanel (t, options = {}) {
 
     return {
       bundleId: 'default-bundle-id',
-      uploadToken: 'default-upload-token'
+      uploadToken: 'default-upload-token',
+      entryPointId: 'default-entry-point-id',
+      entryPointUrl: 'http://localhost:3044'
     }
   })
 
   controlPanel.post('/bundles/:bundleId/deployment', async (request, reply) => {
     const createDeploymentCallback = options.createDeploymentCallback || (() => {})
     await createDeploymentCallback(request, reply)
-
-    return { url: 'http://localhost:3044' }
   })
 
   t.teardown(async () => {
     await controlPanel.close()
   })
+
   await controlPanel.listen({ port: 3042 })
   return controlPanel
 }
 
-async function startHarry (t, uploadCallback = () => {}) {
-  const harry = fastify({ keepAliveTimeout: 1 })
+async function startUploadServer (t, options = {}) {
+  const uploadServer = fastify({ keepAliveTimeout: 1 })
 
-  harry.addContentTypeParser(
+  uploadServer.addContentTypeParser(
     'application/x-tar',
     { bodyLimit: 1024 * 1024 * 1024 },
     (request, payload, done) => done()
   )
 
-  harry.put('/upload', async (request, reply) => {
+  uploadServer.put('/upload', async (request, reply) => {
+    const uploadCallback = options.uploadCallback || (() => {})
     await uploadCallback(request, reply)
   })
 
   t.teardown(async () => {
-    await harry.close()
+    await uploadServer.close()
   })
-  await harry.listen({ port: 3043 })
-  return harry
+
+  await uploadServer.listen({ port: 3043 })
+  return uploadServer
 }
 
-async function startMachine (t, callback) {
+async function startMachine (t, callback = () => {}) {
   const machine = fastify({ keepAliveTimeout: 1 })
 
   machine.get('/', async (request, reply) => {
@@ -128,14 +134,13 @@ async function startMachine (t, callback) {
   t.teardown(async () => {
     await machine.close()
   })
-  await machine.listen({ port: 3044 })
-  return machine
+
+  return machine.listen({ port: 0 })
 }
 
 module.exports = {
   createRepository,
   startControlPanel,
-  startHarry,
-  startMachine,
-  startGithubApi
+  startUploadServer,
+  startMachine
 }

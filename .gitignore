@@ -1,6 +1,7 @@
 *.swp
 .nyc_output
 node_modules/.cache
+node_modules/.package-lock.json
 
 # Comment next line if you want to add a new prod dependency
 node_modules

@@ -13,8 +13,8 @@ require('dotenv').config({ path: join(__dirname, '.env') })
 
 const makePrewarmRequest = require('./lib/prewarm.js')
 
-const STEVE_SERVER_URL = core.getInput('steve_server_url') || process.env.STEVE_SERVER_URL
-const HARRY_SERVER_URL = core.getInput('harry_server_url') || process.env.HARRY_SERVER_URL
+const CONTROL_PANEL_URL = process.env.CONTROL_PANEL_URL
+const UPLOAD_SERVER_URL = process.env.UPLOAD_SERVER_URL
 
 const PLT_MESSAGE_REGEXP = /\*\*Your application was successfully deployed!\*\* :rocket:\nApplication url: (.*).*/
 const APPLICATION_TYPES = ['service', 'db']
@@ -36,7 +36,7 @@ async function createBundle (
   configPath,
   codeChecksum
 ) {
-  const url = STEVE_SERVER_URL + '/bundles'
+  const url = CONTROL_PANEL_URL + '/bundles'
 
   const { statusCode, body } = await request(url, {
     method: 'POST',
@@ -77,7 +77,7 @@ async function createBundle (
 
   if (statusCode !== 200) {
     if (statusCode === 401) {
-      throw new Error('Invalid platformatic_api_key provided')
+      throw new Error('Invalid platformatic_workspace_key provided')
     }
     throw new Error(`Could not create a bundle: ${statusCode}`)
   }
@@ -86,7 +86,7 @@ async function createBundle (
 }
 
 async function uploadCodeArchive (uploadToken, fileData) {
-  const url = HARRY_SERVER_URL + '/upload'
+  const url = UPLOAD_SERVER_URL + '/upload'
   const { statusCode } = await request(url, {
     method: 'PUT',
     headers: {
@@ -108,9 +108,9 @@ async function createDeployment (
   bundleId,
   entryPointId
 ) {
-  const url = STEVE_SERVER_URL + `/bundles/${bundleId}/deployment`
+  const url = CONTROL_PANEL_URL + `/bundles/${bundleId}/deployment`
 
-  const { statusCode, body } = await request(url, {
+  const { statusCode } = await request(url, {
     method: 'POST',
     headers: {
       'x-platformatic-workspace-id': workspaceId,
@@ -129,8 +129,6 @@ async function createDeployment (
     }
     throw new Error(`Could not create a deployment: ${statusCode}`)
   }
-
-  return body.json()
 }
 
 function generateMD5Hash (buffer) {
@@ -311,21 +309,19 @@ async function updatePlatformaticComment (octokit, commentId, comment) {
 
 async function run () {
   try {
-    // const workspaceId = 'af931129-04be-4178-a2ea-1f481a3de2f1'
-    // const workspaceKey = 'test'
+    if (github.context.payload.pull_request === undefined) {
+      throw new Error('Action must be triggered by pull request')
+    }
+
     const workspaceId = core.getInput('platformatic_workspace_id')
     const workspaceKey = core.getInput('platformatic_workspace_key')
 
     if (!workspaceId) {
-      throw new Error('There is no Platformatic workspace id')
+      throw new Error('platformatic_workspace_id action param is required')
     }
 
     if (!workspaceKey) {
-      throw new Error('There is no Platformatic workspace key')
-    }
-
-    if (github.context.payload.pull_request === undefined) {
-      throw new Error('Action must be triggered by pull request')
+      throw new Error('platformatic_workspace_key action param is required')
     }
 
     const githubToken = core.getInput('github_token')
@@ -333,32 +329,7 @@ async function run () {
 
     const pullRequestDetails = await getPullRequestDetails(octokit)
 
-    // const pullRequestDetails = {
-    //   head: {
-    //     ref: 'test',
-    //     repo: {
-    //       full_name: 'test'
-    //     },
-    //     sha: 'test',
-    //     user: {
-    //       login: 'test'
-    //     }
-    //   },
-    //   base: {
-    //     repo: {
-    //       id: 0,
-    //       name: 'test',
-    //       html_url: 'test'
-    //     }
-    //   },
-    //   additions: 0,
-    //   deletions: 0,
-    //   number: 0,
-    //   title: 'test'
-    // }
-
     const pathToProject = process.env.GITHUB_WORKSPACE
-    // const pathToProject = '../../platformatic/test-platformatic-deploy-action-2'
 
     await checkPlatformaticDependency(pathToProject)
 
@@ -424,7 +395,7 @@ async function run () {
     core.info('Application URL: ' + entryPointUrl)
 
     try {
-      core.info('Making prewarm application call...')
+      core.info('Making a prewarm application call...')
       await makePrewarmRequest(entryPointUrl)
       core.info('Application has been successfully prewarmed')
     } catch (error) {
@@ -434,7 +405,7 @@ async function run () {
     }
 
     const commitHash = pullRequestDetails.head.sha
-    const commitUrl = pullRequestDetails.head.repo.html_url + '/commit/' + commitHash
+    const commitUrl = pullRequestDetails.base.repo.html_url + '/commit/' + commitHash
     const platformaticComment = createPlatformaticComment(entryPointUrl, commitHash, commitUrl)
 
     const lastCommentId = await findLastPlatformaticComment(octokit)

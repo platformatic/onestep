@@ -19,12 +19,6 @@ inputs:
   allowed_env_vars:
     description: 'Comma separated list of environment variables to be passed to the Platformatic DB application'
     required: false
-  steve_server_url:
-    description: 'URL of the Steve server'
-    required: false
-  harry_server_url:
-    description: 'URL of the Harry server'
-    required: false
 outputs:
   platformatic_app_url:
     description: 'URL of the deployed Platformatic DB application'
