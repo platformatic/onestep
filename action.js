@@ -106,7 +106,8 @@ async function createDeployment (
   workspaceId,
   workspaceKey,
   bundleId,
-  entryPointId
+  entryPointId,
+  envVariables
 ) {
   const url = CONTROL_PANEL_URL + `/bundles/${bundleId}/deployment`
 
@@ -120,7 +121,7 @@ async function createDeployment (
       accept: 'application/json'
     },
 
-    body: JSON.stringify({ entryPointId })
+    body: JSON.stringify({ entryPointId, envVariables })
   })
 
   if (statusCode !== 200) {
@@ -207,17 +208,11 @@ async function findConfigFile (projectDir) {
   return null
 }
 
-async function mergeEnvVariables (envFilePath, githubEnvVars) {
-  if (Object.keys(githubEnvVars).length === 0) return
+async function getEnvFileVariables (envFilePath) {
+  if (!existsSync(envFilePath)) return {}
 
-  let userEnvVars = {}
-  if (existsSync(envFilePath)) {
-    const userEnvFile = await readFile(envFilePath, 'utf8')
-    userEnvVars = parseEnvVariables(userEnvFile)
-  }
-
-  const mergedEnvVars = { ...githubEnvVars, ...userEnvVars }
-  await writeFile(envFilePath, serializeEnvVariables(mergedEnvVars))
+  const dotEnvFile = await readFile(envFilePath, 'utf8')
+  return parseEnvVariables(dotEnvFile)
 }
 
 function getApplicationType (configPath) {
@@ -360,7 +355,14 @@ async function run () {
 
     const envFileName = core.getInput('platformatic_env_path') || '.env'
     const envFilePath = join(pathToProject, envFileName)
-    await mergeEnvVariables(envFilePath, githubEnvVars)
+    const envFileVars = await getEnvFileVariables(envFilePath)
+
+    const mergedEnvVars = { ...envFileVars, ...githubEnvVars }
+
+    // TODO: remove after platformatic will read env vars control panel
+    if (Object.keys(githubEnvVars).length > 0) {
+      await writeFile(envFilePath, serializeEnvVariables(mergedEnvVars))
+    }
 
     const archivePath = join(pathToProject, '..', 'project.tar')
     await archiveProject(pathToProject, archivePath)
@@ -390,7 +392,13 @@ async function run () {
     await uploadCodeArchive(uploadToken, fileData)
     core.info('Project has been successfully uploaded')
 
-    await createDeployment(workspaceId, workspaceKey, bundleId, entryPointId)
+    await createDeployment(
+      workspaceId,
+      workspaceKey,
+      bundleId,
+      entryPointId,
+      mergedEnvVars
+    )
     core.info('Application has been successfully created')
     core.info('Application URL: ' + entryPointUrl)
 
