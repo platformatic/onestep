@@ -75,8 +75,23 @@ test('action should successfully deploy platformatic project', async (t) => {
       createDeploymentCallback: (request) => {
         t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
         t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
-        t.same(request.body, { entryPointId })
         t.equal(request.params.bundleId, bundleId)
+        t.same(
+          request.body,
+          {
+            entryPointId,
+            variables: {
+              ENV_VARIABLE_1: 'value1',
+              ENV_VARIABLE_2: 'value2',
+              PLT_ENV_VARIABLE: 'value4',
+              PLT_ENV_VARIABLE1: 'platformatic_variable1',
+              PLT_ENV_VARIABLE2: 'platformatic_variable2'
+            },
+            secrets: {
+              ENV_VARIABLE_3: 'value3'
+            }
+          }
+        )
       }
     }
   )
@@ -96,7 +111,14 @@ test('action should successfully deploy platformatic project', async (t) => {
       INPUT_PLATFORMATIC_WORKSPACE_ID: workspaceId,
       INPUT_PLATFORMATIC_WORKSPACE_KEY: workspaceKey,
       INPUT_GITHUB_TOKEN: 'test',
-      PLT_ENV_VARIABLE3: 'value3'
+      INPUT_VARIABLES: 'ENV_VARIABLE_1,ENV_VARIABLE_2',
+      INPUT_SECRETS: 'ENV_VARIABLE_3',
+
+      ENV_VARIABLE_1: 'value1',
+      ENV_VARIABLE_2: 'value2',
+      ENV_VARIABLE_3: 'value3',
+      PLT_ENV_VARIABLE: 'value4',
+      IGNORED_ENV_VARIABLE: 'ignore'
     }
   })
 })
@@ -157,8 +179,15 @@ test('action should show a warning if platformatic dep is not in the dev section
       createDeploymentCallback: (request) => {
         t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
         t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
-        t.same(request.body, { entryPointId })
         t.equal(request.params.bundleId, bundleId)
+        t.same(
+          request.body,
+          {
+            entryPointId,
+            variables: {},
+            secrets: {}
+          }
+        )
       }
     }
   )

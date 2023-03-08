@@ -29,9 +29,11 @@ jobs:
           platformatic_workspace_id: df8d6d16-7cf3-448f-a192-c14daaaf98da
           platformatic_workspace_key: ${{ secrets.PLATFORMATIC_WORKSPACE_KEY }}
           platformatic_config_path: ./platformatic.db.json
-          allowed_env_vars: custom_variable1, custom_variable2
+          variables: custom_variable1, custom_variable2
+          secrets: custom_secret1
         env:
           plt_custom_variable: test1
           custom_variable1: test2
           custom_variable2: test3
+          custom_secret1: test5
 ```

@@ -20,7 +20,9 @@ const PLT_MESSAGE_REGEXP = /\*\*Your application was successfully deployed!\*\* 
 const APPLICATION_TYPES = ['service', 'db']
 const CONFIG_FILE_EXTENSIONS = ['yml', 'yaml', 'json', 'json5', 'tml', 'toml']
 
-const PLATFORMATIC_ENV_VARS = ['PORT', 'DATABASE_URL']
+// TODO: move port and database_url to secrets
+const PLATFORMATIC_VARIABLES = ['PORT', 'DATABASE_URL']
+const PLATFORMATIC_SECRETS = []
 
 async function archiveProject (pathToProject, archivePath) {
   const options = { gzip: false, file: archivePath, cwd: pathToProject }
@@ -107,7 +109,8 @@ async function createDeployment (
   workspaceKey,
   bundleId,
   entryPointId,
-  envVariables
+  variables,
+  secrets
 ) {
   const url = CONTROL_PANEL_URL + `/bundles/${bundleId}/deployment`
 
@@ -121,7 +124,7 @@ async function createDeployment (
       accept: 'application/json'
     },
 
-    body: JSON.stringify({ entryPointId, envVariables })
+    body: JSON.stringify({ entryPointId, variables, secrets })
   })
 
   if (statusCode !== 200) {
@@ -148,24 +151,43 @@ async function getPullRequestDetails (octokit) {
   return pullRequestDetails
 }
 
-function getGithubEnvVariables (allowedEnvVars) {
-  const upperCaseAllowedEnvVars = []
-  for (const allowedEnvVar of allowedEnvVars) {
-    upperCaseAllowedEnvVars.push(allowedEnvVar.toUpperCase().trim())
+function getGithubEnvVariables (variablesNames) {
+  const upperCasedVariablesNames = []
+  for (const variableName of variablesNames) {
+    upperCasedVariablesNames.push(variableName.toUpperCase().trim())
   }
 
   const userEnvVars = {}
   for (const key in process.env) {
     const upperCaseKey = key.toUpperCase().trim()
     if (
-      PLATFORMATIC_ENV_VARS.includes(upperCaseKey) ||
-      upperCaseAllowedEnvVars.includes(upperCaseKey) ||
+      PLATFORMATIC_VARIABLES.includes(upperCaseKey) ||
+      upperCasedVariablesNames.includes(upperCaseKey) ||
       upperCaseKey.startsWith('PLT_')
     ) {
       userEnvVars[upperCaseKey] = process.env[key]
     }
   }
   return userEnvVars
+}
+
+function getGithubSecrets (secretsNames) {
+  const upperCasedSecretsNames = []
+  for (const secretName of secretsNames) {
+    upperCasedSecretsNames.push(secretName.toUpperCase().trim())
+  }
+
+  const secrets = {}
+  for (const key in process.env) {
+    const upperCaseKey = key.toUpperCase().trim()
+    if (
+      PLATFORMATIC_SECRETS.includes(upperCaseKey) ||
+      upperCasedSecretsNames.includes(upperCaseKey)
+    ) {
+      secrets[upperCaseKey] = process.env[key]
+    }
+  }
+  return secrets
 }
 
 function serializeEnvVariables (envVars) {
@@ -348,19 +370,25 @@ async function run () {
       throw new Error('There is no Platformatic config file')
     }
 
-    core.info('Merging environment variables')
-    const allowedEnvVarParam = core.getInput('allowed_env_vars') || ''
-    const allowedEnvVar = allowedEnvVarParam.split(',')
-    const githubEnvVars = getGithubEnvVariables(allowedEnvVar)
+    core.info('Getting environment secrets')
+    const secretsParam = core.getInput('secrets') || ''
+    const secretsNames = secretsParam.split(',')
+    const githubSecrets = getGithubSecrets(secretsNames)
+
+    core.info('Getting environment variables')
+    const envVariablesParam = core.getInput('variables') || ''
+    const envVariablesNames = envVariablesParam.split(',')
+    const githubEnvVariables = getGithubEnvVariables(envVariablesNames)
 
     const envFileName = core.getInput('platformatic_env_path') || '.env'
     const envFilePath = join(pathToProject, envFileName)
     const envFileVars = await getEnvFileVariables(envFilePath)
 
-    const mergedEnvVars = { ...envFileVars, ...githubEnvVars }
+    core.info('Merging environment variables')
+    const mergedEnvVars = { ...envFileVars, ...githubEnvVariables }
 
     // TODO: remove after platformatic will read env vars control panel
-    if (Object.keys(githubEnvVars).length > 0) {
+    if (Object.keys(githubEnvVariables).length > 0) {
       await writeFile(envFilePath, serializeEnvVariables(mergedEnvVars))
     }
 
@@ -397,7 +425,8 @@ async function run () {
       workspaceKey,
       bundleId,
       entryPointId,
-      mergedEnvVars
+      mergedEnvVars,
+      githubSecrets
     )
     core.info('Application has been successfully created')
     core.info('Application URL: ' + entryPointUrl)
