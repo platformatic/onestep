@@ -13,7 +13,7 @@ require('dotenv').config({ path: join(__dirname, '.env') })
 
 const makePrewarmRequest = require('./lib/prewarm.js')
 
-const CONTROL_PANEL_URL = process.env.CONTROL_PANEL_URL
+const DEPLOY_SERVICE_HOST = process.env.DEPLOY_SERVICE_HOST
 const UPLOAD_SERVER_URL = process.env.UPLOAD_SERVER_URL
 
 const PLT_MESSAGE_REGEXP = /\*\*Your application was successfully deployed!\*\* :rocket:\nApplication url: (.*).*/
@@ -38,7 +38,7 @@ async function createBundle (
   configPath,
   codeChecksum
 ) {
-  const url = CONTROL_PANEL_URL + '/bundles'
+  const url = DEPLOY_SERVICE_HOST + '/bundles'
 
   const { statusCode, body } = await request(url, {
     method: 'POST',
@@ -112,7 +112,7 @@ async function createDeployment (
   variables,
   secrets
 ) {
-  const url = CONTROL_PANEL_URL + `/bundles/${bundleId}/deployment`
+  const url = DEPLOY_SERVICE_HOST + `/bundles/${bundleId}/deployment`
 
   const { statusCode } = await request(url, {
     method: 'POST',

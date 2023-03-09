@@ -9,7 +9,7 @@ const { createRepository } = require('./helper.js')
 const defaultEnvVars = {
   GITHUB_WORKSPACE: '',
 
-  CONTROL_PANEL_URL: 'http://localhost:3042',
+  DEPLOY_SERVICE_HOST: 'http://localhost:3042',
   UPLOAD_SERVER_URL: 'http://localhost:3043'
 }
 
