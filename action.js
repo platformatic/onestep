@@ -32,7 +32,6 @@ async function archiveProject (pathToProject, archivePath) {
 async function createBundle (
   workspaceId,
   workspaceKey,
-  label,
   appType,
   pullRequestDetails,
   configPath,
@@ -50,7 +49,6 @@ async function createBundle (
       accept: 'application/json'
     },
     body: JSON.stringify({
-      label,
       bundle: {
         appType,
         configPath,
@@ -108,7 +106,7 @@ async function createDeployment (
   workspaceId,
   workspaceKey,
   bundleId,
-  entryPointId,
+  label,
   variables,
   secrets
 ) {
@@ -124,7 +122,7 @@ async function createDeployment (
       accept: 'application/json'
     },
 
-    body: JSON.stringify({ entryPointId, variables, secrets })
+    body: JSON.stringify({ label, variables, secrets })
   })
 
   if (statusCode !== 200) {
@@ -401,15 +399,9 @@ async function run () {
 
     const label = `github-pr:${pullRequestDetails.number}`
 
-    const {
-      bundleId,
-      uploadToken,
-      entryPointId,
-      entryPointUrl
-    } = await createBundle(
+    const { bundleId, uploadToken } = await createBundle(
       workspaceId,
       workspaceKey,
-      label,
       appType,
       pullRequestDetails,
       configPath,
@@ -420,11 +412,11 @@ async function run () {
     await uploadCodeArchive(uploadToken, fileData)
     core.info('Project has been successfully uploaded')
 
-    await createDeployment(
+    const { entryPointUrl } = await createDeployment(
       workspaceId,
       workspaceKey,
       bundleId,
-      entryPointId,
+      label,
       mergedEnvVars,
       githubSecrets
     )
