@@ -112,7 +112,7 @@ async function createDeployment (
 ) {
   const url = DEPLOY_SERVICE_HOST + `/bundles/${bundleId}/deployment`
 
-  const { statusCode } = await request(url, {
+  const { statusCode, body } = await request(url, {
     method: 'POST',
     headers: {
       'x-platformatic-workspace-id': workspaceId,
@@ -131,6 +131,8 @@ async function createDeployment (
     }
     throw new Error(`Could not create a deployment: ${statusCode}`)
   }
+
+  return body.json()
 }
 
 function generateMD5Hash (buffer) {
