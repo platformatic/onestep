@@ -399,7 +399,7 @@ async function run () {
 
     const label = `github-pr:${pullRequestDetails.number}`
 
-    const { bundleId, uploadToken } = await createBundle(
+    const { id: bundleId, uploadToken } = await createBundle(
       workspaceId,
       workspaceKey,
       appType,
