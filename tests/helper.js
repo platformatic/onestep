@@ -82,12 +82,12 @@ async function startDeployService (t, options) {
     await createBundleCallback(request, reply)
 
     return {
-      bundleId: 'default-bundle-id',
-      uploadToken: 'default-upload-token'
+      id: 'default-bundle-id',
+      token: 'default-upload-token'
     }
   })
 
-  deployService.post('/bundles/:bundleId/deployment', async (request, reply) => {
+  deployService.post('/deployments', async (request, reply) => {
     const createDeploymentCallback = options.createDeploymentCallback
     await createDeploymentCallback(request, reply)
   })

@@ -84,13 +84,13 @@ async function createBundle (
   return body.json()
 }
 
-async function uploadCodeArchive (uploadToken, fileData) {
+async function uploadCodeArchive (token, fileData) {
   const url = DEPLOY_SERVICE_HOST + '/upload'
   const { statusCode } = await request(url, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/x-tar',
-      authorization: `Bearer ${uploadToken}`
+      authorization: `Bearer ${token}`
     },
     body: fileData,
     headersTimeout: 60 * 1000
@@ -104,12 +104,12 @@ async function uploadCodeArchive (uploadToken, fileData) {
 async function createDeployment (
   workspaceId,
   workspaceKey,
-  bundleId,
+  token,
   label,
   variables,
   secrets
 ) {
-  const url = DEPLOY_SERVICE_HOST + `/bundles/${bundleId}/deployment`
+  const url = DEPLOY_SERVICE_HOST + '/deployments'
 
   const { statusCode, body } = await request(url, {
     method: 'POST',
@@ -118,6 +118,7 @@ async function createDeployment (
       'x-platformatic-api-key': workspaceKey,
       'content-type': 'application/json',
       'accept-encoding': '*',
+      authorization: `Bearer ${token}`,
       accept: 'application/json'
     },
 
@@ -400,7 +401,7 @@ async function run () {
 
     const label = `github-pr:${pullRequestDetails.number}`
 
-    const { id: bundleId, uploadToken } = await createBundle(
+    const { token } = await createBundle(
       workspaceId,
       workspaceKey,
       appType,
@@ -410,13 +411,13 @@ async function run () {
     )
 
     core.info('Uploading code archive to the cloud...')
-    await uploadCodeArchive(uploadToken, fileData)
+    await uploadCodeArchive(token, fileData)
     core.info('Project has been successfully uploaded')
 
     const { entryPointUrl } = await createDeployment(
       workspaceId,
       workspaceKey,
-      bundleId,
+      token,
       label,
       mergedEnvVars,
       githubSecrets

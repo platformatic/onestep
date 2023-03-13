@@ -19,7 +19,7 @@ test('action should successfully deploy platformatic project', async (t) => {
   t.plan(10)
 
   const bundleId = 'test-bundle-id'
-  const uploadToken = 'test-upload-token'
+  const token = 'test-upload-token'
 
   const workspaceId = 'test-workspace-id'
   const workspaceKey = 'test-workspace-key'
@@ -59,12 +59,12 @@ test('action should successfully deploy platformatic project', async (t) => {
           }
         })
         t.ok(request.body.bundle.codeChecksum)
-        reply.code(200).send({ id: bundleId, uploadToken })
+        reply.code(200).send({ id: bundleId, token })
       },
       createDeploymentCallback: (request, reply) => {
         t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
         t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
-        t.equal(request.params.bundleId, bundleId)
+        t.equal(request.headers.authorization, `Bearer ${token}`)
         t.same(
           request.body,
           {
@@ -84,7 +84,7 @@ test('action should successfully deploy platformatic project', async (t) => {
         reply.code(200).send({ entryPointUrl })
       },
       uploadCallback: (request) => {
-        t.equal(request.headers.authorization, `Bearer ${uploadToken}`)
+        t.equal(request.headers.authorization, `Bearer ${token}`)
       }
     }
   )
@@ -111,7 +111,7 @@ test('action should show a warning if platformatic dep is not in the dev section
   t.plan(11)
 
   const bundleId = 'test-bundle-id'
-  const uploadToken = 'test-upload-token'
+  const token = 'test-upload-token'
 
   const workspaceId = 'test-workspace-id'
   const workspaceKey = 'test-workspace-key'
@@ -151,12 +151,12 @@ test('action should show a warning if platformatic dep is not in the dev section
           }
         })
         t.ok(request.body.bundle.codeChecksum)
-        reply.code(200).send({ id: bundleId, uploadToken })
+        reply.code(200).send({ id: bundleId, token })
       },
       createDeploymentCallback: (request, reply) => {
         t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
         t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
-        t.equal(request.params.bundleId, bundleId)
+        t.equal(request.headers.authorization, `Bearer ${token}`)
         t.same(
           request.body,
           {
@@ -168,7 +168,7 @@ test('action should show a warning if platformatic dep is not in the dev section
         reply.code(200).send({ entryPointUrl })
       },
       uploadCallback: (request) => {
-        t.equal(request.headers.authorization, `Bearer ${uploadToken}`)
+        t.equal(request.headers.authorization, `Bearer ${token}`)
       }
     }
   )
@@ -191,13 +191,13 @@ test('action should show a warning if platformatic dep is not in the dev section
 // TODO: remove this test
 test('action should create a .env file if it does not exist', async (t) => {
   const bundleId = 'test-bundle-id'
-  const uploadToken = 'test-upload-token'
+  const token = 'test-upload-token'
 
   const entryPointUrl = await startMachine(t)
 
   await startDeployService(t, {
     createBundleCallback: (request, reply) => {
-      reply.code(200).send({ id: bundleId, uploadToken })
+      reply.code(200).send({ id: bundleId, token })
     },
     createDeploymentCallback: (request, reply) => {
       reply.code(200).send({ entryPointUrl })
@@ -402,7 +402,7 @@ test('action should fail if it could not upload code tarball', async (t) => {
 
 test('action should fail if it could not make a prewarm call', async (t) => {
   const bundleId = 'test-bundle-id'
-  const uploadToken = 'test-upload-token'
+  const token = 'test-upload-token'
 
   const entryPointUrl = await startMachine(t, (request, reply) => {
     reply.status(500).send({ message: 'Error' })
@@ -410,7 +410,7 @@ test('action should fail if it could not make a prewarm call', async (t) => {
 
   await startDeployService(t, {
     createBundleCallback: (request, reply) => {
-      reply.code(200).send({ id: bundleId, uploadToken })
+      reply.code(200).send({ id: bundleId, token })
     },
     createDeploymentCallback: (request, reply) => {
       reply.code(200).send({ entryPointUrl })
