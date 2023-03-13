@@ -58,7 +58,7 @@ test('action should successfully deploy platformatic project', async (t) => {
             title: 'Test PR title'
           }
         })
-        t.ok(request.body.bundle.codeChecksum)
+        t.ok(request.body.bundle.checksum)
         reply.code(200).send({ id: bundleId, token })
       },
       createDeploymentCallback: (request, reply) => {
@@ -150,7 +150,7 @@ test('action should show a warning if platformatic dep is not in the dev section
             title: 'Test PR title'
           }
         })
-        t.ok(request.body.bundle.codeChecksum)
+        t.ok(request.body.bundle.checksum)
         reply.code(200).send({ id: bundleId, token })
       },
       createDeploymentCallback: (request, reply) => {
