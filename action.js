@@ -34,7 +34,8 @@ async function createBundle (
   appType,
   pullRequestDetails,
   configPath,
-  codeChecksum
+  checksum,
+  size
 ) {
   const url = DEPLOY_SERVICE_HOST + '/bundles'
 
@@ -51,7 +52,8 @@ async function createBundle (
       bundle: {
         appType,
         configPath,
-        codeChecksum
+        checksum,
+        size
       },
       repository: {
         name: pullRequestDetails.base.repo.name,
@@ -84,12 +86,14 @@ async function createBundle (
   return body.json()
 }
 
-async function uploadCodeArchive (token, fileData) {
+async function uploadCodeArchive (token, fileData, bundleSize, bundleChecksum) {
   const url = DEPLOY_SERVICE_HOST + '/upload'
   const { statusCode } = await request(url, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/x-tar',
+      'Content-Length': bundleSize,
+      'Content-MD5': bundleChecksum,
       authorization: `Bearer ${token}`
     },
     body: fileData,
@@ -397,7 +401,8 @@ async function run () {
     core.info('Project has been successfully archived')
 
     const fileData = await readFile(archivePath)
-    const codeChecksum = generateMD5Hash(fileData)
+    const bundleChecksum = generateMD5Hash(fileData)
+    const bundleSize = fileData.length
 
     const label = `github-pr:${pullRequestDetails.number}`
 
@@ -407,11 +412,12 @@ async function run () {
       appType,
       pullRequestDetails,
       configPath,
-      codeChecksum
+      bundleChecksum,
+      bundleSize
     )
 
     core.info('Uploading code archive to the cloud...')
-    await uploadCodeArchive(token, fileData)
+    await uploadCodeArchive(token, fileData, bundleSize, bundleChecksum)
     core.info('Project has been successfully uploaded')
 
     const { entryPointUrl } = await createDeployment(
