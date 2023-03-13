@@ -8,9 +8,7 @@ const { createRepository } = require('./helper.js')
 
 const defaultEnvVars = {
   GITHUB_WORKSPACE: '',
-
-  DEPLOY_SERVICE_HOST: 'http://localhost:3042',
-  UPLOAD_SERVER_URL: 'http://localhost:3043'
+  DEPLOY_SERVICE_HOST: 'http://localhost:3042'
 }
 
 async function run () {

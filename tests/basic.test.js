@@ -7,11 +7,7 @@ const { mkdtemp, readdir, rm } = require('fs/promises')
 const tar = require('tar')
 const { test, before } = require('tap')
 
-const {
-  startControlPanel,
-  startUploadServer,
-  startMachine
-} = require('./helper.js')
+const { startDeployService, startMachine } = require('./helper.js')
 
 let execaNode = null
 before(async (t) => {
@@ -23,7 +19,6 @@ test('action should successfully deploy platformatic project', async (t) => {
   t.plan(10)
 
   const bundleId = 'test-bundle-id'
-  const entryPointId = 'test-entry-point-id'
   const uploadToken = 'test-upload-token'
 
   const workspaceId = 'test-workspace-id'
@@ -33,14 +28,13 @@ test('action should successfully deploy platformatic project', async (t) => {
     t.pass('Action should make a prewarm request to the machine')
   })
 
-  await startControlPanel(
+  await startDeployService(
     t,
     {
       createBundleCallback: (request, reply) => {
         t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
         t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
         t.match(request.body, {
-          label: 'github-pr:1',
           bundle: {
             appType: 'db',
             configPath: 'platformatic.db.json'
@@ -65,21 +59,16 @@ test('action should successfully deploy platformatic project', async (t) => {
           }
         })
         t.ok(request.body.bundle.codeChecksum)
-        reply.code(200).send({
-          bundleId,
-          uploadToken,
-          entryPointId,
-          entryPointUrl
-        })
+        reply.code(200).send({ id: bundleId, uploadToken })
       },
-      createDeploymentCallback: (request) => {
+      createDeploymentCallback: (request, reply) => {
         t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
         t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
         t.equal(request.params.bundleId, bundleId)
         t.same(
           request.body,
           {
-            entryPointId,
+            label: 'github-pr:1',
             variables: {
               ENV_VARIABLE_1: 'value1',
               ENV_VARIABLE_2: 'value2',
@@ -92,13 +81,8 @@ test('action should successfully deploy platformatic project', async (t) => {
             }
           }
         )
-      }
-    }
-  )
-
-  await startUploadServer(
-    t,
-    {
+        reply.code(200).send({ entryPointUrl })
+      },
       uploadCallback: (request) => {
         t.equal(request.headers.authorization, `Bearer ${uploadToken}`)
       }
@@ -127,7 +111,6 @@ test('action should show a warning if platformatic dep is not in the dev section
   t.plan(11)
 
   const bundleId = 'test-bundle-id'
-  const entryPointId = 'test-entry-point-id'
   const uploadToken = 'test-upload-token'
 
   const workspaceId = 'test-workspace-id'
@@ -137,14 +120,13 @@ test('action should show a warning if platformatic dep is not in the dev section
     t.pass('Action should make a prewarm request to the machine')
   })
 
-  await startControlPanel(
+  await startDeployService(
     t,
     {
       createBundleCallback: (request, reply) => {
         t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
         t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
         t.match(request.body, {
-          label: 'github-pr:1',
           bundle: {
             appType: 'db',
             configPath: 'platformatic.db.json'
@@ -169,32 +151,22 @@ test('action should show a warning if platformatic dep is not in the dev section
           }
         })
         t.ok(request.body.bundle.codeChecksum)
-        reply.code(200).send({
-          bundleId,
-          uploadToken,
-          entryPointId,
-          entryPointUrl
-        })
+        reply.code(200).send({ id: bundleId, uploadToken })
       },
-      createDeploymentCallback: (request) => {
+      createDeploymentCallback: (request, reply) => {
         t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
         t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
         t.equal(request.params.bundleId, bundleId)
         t.same(
           request.body,
           {
-            entryPointId,
+            label: 'github-pr:1',
             variables: {},
             secrets: {}
           }
         )
-      }
-    }
-  )
-
-  await startUploadServer(
-    t,
-    {
+        reply.code(200).send({ entryPointUrl })
+      },
       uploadCallback: (request) => {
         t.equal(request.headers.authorization, `Bearer ${uploadToken}`)
       }
@@ -216,25 +188,20 @@ test('action should show a warning if platformatic dep is not in the dev section
   t.ok(outputLines.includes(warningMessage))
 })
 
+// TODO: remove this test
 test('action should create a .env file if it does not exist', async (t) => {
   const bundleId = 'test-bundle-id'
-  const entryPointId = 'test-entry-point-id'
   const uploadToken = 'test-upload-token'
 
   const entryPointUrl = await startMachine(t)
 
-  await startControlPanel(t, {
+  await startDeployService(t, {
     createBundleCallback: (request, reply) => {
-      reply.code(200).send({
-        bundleId,
-        uploadToken,
-        entryPointId,
-        entryPointUrl
-      })
-    }
-  })
-
-  await startUploadServer(t, {
+      reply.code(200).send({ id: bundleId, uploadToken })
+    },
+    createDeploymentCallback: (request, reply) => {
+      reply.code(200).send({ entryPointUrl })
+    },
     uploadCallback: async (request, reply) => {
       const tmpDir = await mkdtemp(join(tmpdir(), 'action_env_'))
       const stream = request.raw.pipe(tar.x({ strip: 1, C: tmpDir }))
@@ -294,7 +261,7 @@ test('action should fail if there is no platformatic_workspace_key input param',
 })
 
 test('action should fail if platformatic_api_key is wrong', async (t) => {
-  await startControlPanel(
+  await startDeployService(
     t,
     {
       createBundleCallback: (request, reply) => {
@@ -322,7 +289,7 @@ test('action should fail if platformatic_api_key is wrong', async (t) => {
 })
 
 test('action should fail if it could not create a bundle', async (t) => {
-  await startControlPanel(
+  await startDeployService(
     t,
     {
       createBundleCallback: (request, reply) => {
@@ -350,20 +317,17 @@ test('action should fail if it could not create a bundle', async (t) => {
 })
 
 test('action should fail if platformatic_api_key is wrong', async (t) => {
-  await startControlPanel(
+  await startDeployService(
     t,
     {
       createDeploymentCallback: (request, reply) => {
         reply.status(401).send({ message: 'Unauthorized' })
+      },
+      uploadCallback: () => {
+        t.pass('action should upload code to harry')
       }
     }
   )
-
-  await startUploadServer(t, {
-    uploadCallback: () => {
-      t.pass('action should upload code to harry')
-    }
-  })
 
   try {
     await execaNode('execute.js', {
@@ -384,7 +348,7 @@ test('action should fail if platformatic_api_key is wrong', async (t) => {
 })
 
 test('action should fail if it could not create a deployment', async (t) => {
-  await startControlPanel(
+  await startDeployService(
     t,
     {
       createDeploymentCallback: (request, reply) => {
@@ -392,7 +356,6 @@ test('action should fail if it could not create a deployment', async (t) => {
       }
     }
   )
-  await startUploadServer(t)
 
   try {
     await execaNode('execute.js', {
@@ -413,8 +376,7 @@ test('action should fail if it could not create a deployment', async (t) => {
 })
 
 test('action should fail if it could not upload code tarball', async (t) => {
-  await startControlPanel(t)
-  await startUploadServer(t, {
+  await startDeployService(t, {
     uploadCallback: (request, reply) => {
       reply.status(500).send({ message: 'Error' })
     }
@@ -440,25 +402,20 @@ test('action should fail if it could not upload code tarball', async (t) => {
 
 test('action should fail if it could not make a prewarm call', async (t) => {
   const bundleId = 'test-bundle-id'
-  const entryPointId = 'test-entry-point-id'
   const uploadToken = 'test-upload-token'
 
   const entryPointUrl = await startMachine(t, (request, reply) => {
     reply.status(500).send({ message: 'Error' })
   })
 
-  await startControlPanel(t, {
+  await startDeployService(t, {
     createBundleCallback: (request, reply) => {
-      reply.code(200).send({
-        bundleId,
-        uploadToken,
-        entryPointId,
-        entryPointUrl
-      })
+      reply.code(200).send({ id: bundleId, uploadToken })
+    },
+    createDeploymentCallback: (request, reply) => {
+      reply.code(200).send({ entryPointUrl })
     }
   })
-
-  await startUploadServer(t)
 
   try {
     await execaNode('execute.js', {

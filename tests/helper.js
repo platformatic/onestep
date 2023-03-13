@@ -74,54 +74,41 @@ function startGithubApi (owner, repositoryName, prNumber, prTitle) {
     })
 }
 
-async function startControlPanel (t, options = {}) {
-  const controlPanel = fastify({ keepAliveTimeout: 1 })
+async function startDeployService (t, options) {
+  const deployService = fastify({ keepAliveTimeout: 1 })
 
-  controlPanel.post('/bundles', async (request, reply) => {
+  deployService.post('/bundles', async (request, reply) => {
     const createBundleCallback = options.createBundleCallback || (() => {})
     await createBundleCallback(request, reply)
 
     return {
       bundleId: 'default-bundle-id',
-      uploadToken: 'default-upload-token',
-      entryPointId: 'default-entry-point-id',
-      entryPointUrl: 'http://localhost:3044'
+      uploadToken: 'default-upload-token'
     }
   })
 
-  controlPanel.post('/bundles/:bundleId/deployment', async (request, reply) => {
-    const createDeploymentCallback = options.createDeploymentCallback || (() => {})
+  deployService.post('/bundles/:bundleId/deployment', async (request, reply) => {
+    const createDeploymentCallback = options.createDeploymentCallback
     await createDeploymentCallback(request, reply)
   })
 
-  t.teardown(async () => {
-    await controlPanel.close()
-  })
-
-  await controlPanel.listen({ port: 3042 })
-  return controlPanel
-}
-
-async function startUploadServer (t, options = {}) {
-  const uploadServer = fastify({ keepAliveTimeout: 1 })
-
-  uploadServer.addContentTypeParser(
+  deployService.addContentTypeParser(
     'application/x-tar',
     { bodyLimit: 1024 * 1024 * 1024 },
     (request, payload, done) => done()
   )
 
-  uploadServer.put('/upload', async (request, reply) => {
+  deployService.put('/upload', async (request, reply) => {
     const uploadCallback = options.uploadCallback || (() => {})
     await uploadCallback(request, reply)
   })
 
   t.teardown(async () => {
-    await uploadServer.close()
+    await deployService.close()
   })
 
-  await uploadServer.listen({ port: 3043 })
-  return uploadServer
+  await deployService.listen({ port: 3042 })
+  return deployService
 }
 
 async function startMachine (t, callback = () => {}) {
@@ -140,7 +127,6 @@ async function startMachine (t, callback = () => {}) {
 
 module.exports = {
   createRepository,
-  startControlPanel,
-  startUploadServer,
+  startDeployService,
   startMachine
 }
