@@ -1,158 +1,86 @@
 'use strict'
 
-const { join, basename } = require('path')
-const { createHash } = require('crypto')
-const { existsSync } = require('fs')
-const { readFile, writeFile, access, readdir } = require('fs/promises')
+const { join } = require('path')
 
 const core = require('@actions/core')
 const github = require('@actions/github')
-const tar = require('tar')
-const { request } = require('undici')
 require('dotenv').config({ path: join(__dirname, '.env') })
 
-const makePrewarmRequest = require('./lib/prewarm.js')
-
-const DEPLOY_SERVICE_HOST = process.env.DEPLOY_SERVICE_HOST
+const { deploy } = require('./lib/deploy.js')
 
 const PLT_MESSAGE_REGEXP = /\*\*Your application was successfully deployed!\*\* :rocket:\nApplication url: (.*).*/
-const APPLICATION_TYPES = ['service', 'db']
-const CONFIG_FILE_EXTENSIONS = ['yml', 'yaml', 'json', 'json5', 'tml', 'toml']
 
 // TODO: move port and database_url to secrets
 const PLATFORMATIC_VARIABLES = ['PORT', 'DATABASE_URL']
 const PLATFORMATIC_SECRETS = []
 
-async function archiveProject (pathToProject, archivePath) {
-  const options = { gzip: false, file: archivePath, cwd: pathToProject }
-  return tar.create(options, ['.'])
-}
+function getRepositoryMetadata () {
+  const context = github.context.payload
 
-async function createBundle (
-  workspaceId,
-  workspaceKey,
-  appType,
-  pullRequestDetails,
-  configPath,
-  checksum,
-  size
-) {
-  const url = DEPLOY_SERVICE_HOST + '/bundles'
-
-  const { statusCode, body } = await request(url, {
-    method: 'POST',
-    headers: {
-      'x-platformatic-workspace-id': workspaceId,
-      'x-platformatic-api-key': workspaceKey,
-      'content-type': 'application/json',
-      'accept-encoding': '*',
-      accept: 'application/json'
-    },
-    body: JSON.stringify({
-      bundle: {
-        appType,
-        configPath,
-        checksum,
-        size
-      },
-      repository: {
-        name: pullRequestDetails.base.repo.name,
-        url: pullRequestDetails.base.repo.html_url,
-        githubRepoId: pullRequestDetails.base.repo.id
-      },
-      branch: {
-        name: pullRequestDetails.head.ref
-      },
-      commit: {
-        sha: pullRequestDetails.head.sha,
-        username: pullRequestDetails.head.user.login,
-        additions: pullRequestDetails.additions,
-        deletions: pullRequestDetails.deletions
-      },
-      pullRequest: {
-        title: pullRequestDetails.title,
-        number: pullRequestDetails.number
-      }
-    })
-  })
-
-  if (statusCode !== 200) {
-    if (statusCode === 401) {
-      throw new Error('Invalid platformatic_workspace_key provided')
-    }
-    throw new Error(`Could not create a bundle: ${statusCode}`)
-  }
-
-  return body.json()
-}
-
-async function uploadCodeArchive (token, fileData, bundleSize, bundleChecksum) {
-  const url = DEPLOY_SERVICE_HOST + '/upload'
-  const { statusCode } = await request(url, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/x-tar',
-      'Content-Length': bundleSize,
-      'Content-MD5': bundleChecksum,
-      authorization: `Bearer ${token}`
-    },
-    body: fileData,
-    headersTimeout: 60 * 1000
-  })
-
-  if (statusCode !== 200) {
-    throw new Error(`Failed to upload code archive: ${statusCode}`)
+  return {
+    name: context.repository.name,
+    url: context.repository.html_url,
+    githubRepoId: context.repository.id
   }
 }
 
-async function createDeployment (
-  workspaceId,
-  workspaceKey,
-  token,
-  label,
-  variables,
-  secrets
-) {
-  const url = DEPLOY_SERVICE_HOST + '/deployments'
+function getBranchMetadata () {
+  const headRef = process.env.GITHUB_HEAD_REF
+  const refName = process.env.GITHUB_REF_NAME
+  const branchName = headRef || refName
 
-  const { statusCode, body } = await request(url, {
-    method: 'POST',
-    headers: {
-      'x-platformatic-workspace-id': workspaceId,
-      'x-platformatic-api-key': workspaceKey,
-      'content-type': 'application/json',
-      'accept-encoding': '*',
-      authorization: `Bearer ${token}`,
-      accept: 'application/json'
-    },
+  return { name: branchName }
+}
 
-    body: JSON.stringify({ label, variables, secrets })
+async function getHeadCommitMetadata (octokit) {
+  const context = github.context.payload
+
+  const { data: commitDetails } = await octokit.rest.repos.getCommit({
+    owner: context.repository.owner.login,
+    repo: context.repository.name,
+    ref: context.after
   })
 
-  if (statusCode !== 200) {
-    if (statusCode === 401) {
-      throw new Error('Invalid platformatic_api_key provided')
-    }
-    throw new Error(`Could not create a deployment: ${statusCode}`)
+  return {
+    sha: commitDetails.sha,
+    username: commitDetails.author.login,
+    additions: commitDetails.stats.additions,
+    deletions: commitDetails.stats.deletions
   }
-
-  return body.json()
 }
 
-function generateMD5Hash (buffer) {
-  return createHash('md5').update(buffer).digest('base64')
-}
-
-async function getPullRequestDetails (octokit) {
-  const pullRequestInfo = github.context.payload.pull_request
+async function getPullRequestMetadata (octokit) {
+  const context = github.context.payload
 
   const { data: pullRequestDetails } = await octokit.rest.pulls.get({
-    owner: pullRequestInfo.base.repo.owner.login,
-    repo: pullRequestInfo.base.repo.name,
-    pull_number: pullRequestInfo.number
+    owner: context.repository.owner.login,
+    repo: context.repository.name,
+    pull_number: context.pull_request.number
   })
 
-  return pullRequestDetails
+  return {
+    title: pullRequestDetails.title,
+    number: pullRequestDetails.number
+  }
+}
+
+async function getGithubMetadata (octokit, isPullRequest) {
+  const repositoryMetadata = getRepositoryMetadata()
+  const branchMetadata = getBranchMetadata()
+  const commitMetadata = await getHeadCommitMetadata(octokit)
+
+  const githubMetadata = {
+    repository: repositoryMetadata,
+    branch: branchMetadata,
+    commit: commitMetadata
+  }
+
+  if (isPullRequest) {
+    const pullRequestMetadata = await getPullRequestMetadata(octokit)
+    githubMetadata.pullRequest = pullRequestMetadata
+  }
+
+  return githubMetadata
 }
 
 function getGithubEnvVariables (variablesNames) {
@@ -194,69 +122,14 @@ function getGithubSecrets (secretsNames) {
   return secrets
 }
 
-function serializeEnvVariables (envVars) {
-  let serializedEnvVars = ''
-  for (const key in envVars) {
-    serializedEnvVars += `${key}=${envVars[key]}\n`
-  }
-  return serializedEnvVars
-}
-
-function parseEnvVariables (envVars) {
-  const parsedEnvVars = {}
-  for (const line of envVars.split('\n')) {
-    if (line === '') continue
-    const [key, value] = line.split('=')
-    parsedEnvVars[key] = value
-  }
-  return parsedEnvVars
-}
-
-async function findConfigFile (projectDir) {
-  const files = await readdir(projectDir)
-
-  for (const file of files) {
-    const filename = basename(file)
-    const filenameParts = filename.split('.')
-
-    if (filenameParts.length === 3) {
-      const [name, ext1, ext2] = filenameParts
-      if (
-        name === 'platformatic' &&
-        APPLICATION_TYPES.includes(ext1) &&
-        CONFIG_FILE_EXTENSIONS.includes(ext2)
-      ) {
-        return filename
-      }
-    }
-  }
-
-  return null
-}
-
-async function getEnvFileVariables (envFilePath) {
-  if (!existsSync(envFilePath)) return {}
-
-  const dotEnvFile = await readFile(envFilePath, 'utf8')
-  return parseEnvVariables(dotEnvFile)
-}
-
-function getApplicationType (configPath) {
-  const appType = configPath.split('.').slice(-2)[0]
-  if (!APPLICATION_TYPES.includes(appType)) {
-    throw new Error(`Invalid application type: ${appType}, must be one of: ${APPLICATION_TYPES.join(', ')}`)
-  }
-  return appType
-}
-
 /* istanbul ignore next */
 async function findLastPlatformaticComment (octokit) {
-  const pullRequestInfo = github.context.payload.pull_request
+  const context = github.context.payload
 
   const { data: comments } = await octokit.rest.issues.listComments({
-    owner: pullRequestInfo.base.repo.owner.login,
-    repo: pullRequestInfo.base.repo.name,
-    issue_number: pullRequestInfo.number
+    owner: context.repository.owner.login,
+    repo: context.repository.name,
+    issue_number: context.pull_request.number
   })
 
   const platformaticComments = comments
@@ -282,41 +155,15 @@ function createPlatformaticComment (applicationUrl, commitHash, commitUrl) {
   ].join('\n')
 }
 
-async function isFileAccessible (path) {
-  try {
-    await access(path)
-    return true
-  } catch (err) {
-    return false
-  }
-}
-
 async function postPlatformaticComment (octokit, comment) {
-  const pullRequestInfo = github.context.payload.pull_request
+  const context = github.context.payload
 
   await octokit.rest.issues.createComment({
-    ...github.context.repo,
-    issue_number: pullRequestInfo.number,
+    owner: context.repository.owner.login,
+    repo: context.repository.name,
+    issue_number: context.pull_request.number,
     body: comment
   })
-}
-
-async function checkPlatformaticDependency (projectPath) {
-  const packageJsonPath = join(projectPath, 'package.json')
-
-  const packageJsonExist = await isFileAccessible(packageJsonPath)
-  if (!packageJsonExist) return
-
-  const packageJsonData = await readFile(packageJsonPath, 'utf8')
-  const packageJson = JSON.parse(packageJsonData)
-
-  const dependencies = packageJson.dependencies
-  if (
-    dependencies !== undefined &&
-    dependencies.platformatic !== undefined
-  ) {
-    core.warning('Move platformatic dependency to devDependencies to speed up deployment')
-  }
 }
 
 /* istanbul ignore next */
@@ -330,127 +177,71 @@ async function updatePlatformaticComment (octokit, commentId, comment) {
 
 async function run () {
   try {
-    if (github.context.payload.pull_request === undefined) {
-      throw new Error('Action must be triggered by pull request')
+    const eventName = process.env.GITHUB_EVENT_NAME
+    if (eventName !== 'push' && eventName !== 'pull_request') {
+      throw new Error('The action only works on push and pull_request events')
     }
 
     const workspaceId = core.getInput('platformatic_workspace_id')
     const workspaceKey = core.getInput('platformatic_workspace_key')
 
-    if (!workspaceId) {
-      throw new Error('platformatic_workspace_id action param is required')
-    }
+    const pathToConfig = core.getInput('platformatic_config_path')
+    const pathToEnvFile = core.getInput('platformatic_env_path')
 
-    if (!workspaceKey) {
-      throw new Error('platformatic_workspace_key action param is required')
-    }
+    const pathToProject = process.env.GITHUB_WORKSPACE
+    const deployServiceHost = process.env.DEPLOY_SERVICE_HOST
 
     const githubToken = core.getInput('github_token')
     const octokit = github.getOctokit(githubToken)
 
-    const pullRequestDetails = await getPullRequestDetails(octokit)
-
-    const pathToProject = process.env.GITHUB_WORKSPACE
-
-    await checkPlatformaticDependency(pathToProject)
-
-    let configPath = core.getInput('platformatic_config_path')
-    if (!configPath) {
-      configPath = await findConfigFile(pathToProject)
-
-      if (configPath === null) {
-        throw new Error('Could not find Platformatic config file, please specify it in the action input')
-      } else {
-        core.info(`Found Platformatic config file: ${configPath}`)
-      }
-    }
-
-    const appType = getApplicationType(configPath)
-
-    const configAbsolutePath = join(pathToProject, configPath)
-    const configFileExist = await isFileAccessible(configAbsolutePath)
-
-    if (!configFileExist) {
-      throw new Error('There is no Platformatic config file')
-    }
+    const isPullRequest = github.context.eventName === 'pull_request'
+    const githubMetadata = await getGithubMetadata(octokit, isPullRequest)
 
     core.info('Getting environment secrets')
     const secretsParam = core.getInput('secrets') || ''
     const secretsNames = secretsParam.split(',')
-    const githubSecrets = getGithubSecrets(secretsNames)
+    const secrets = getGithubSecrets(secretsNames)
 
     core.info('Getting environment variables')
     const envVariablesParam = core.getInput('variables') || ''
     const envVariablesNames = envVariablesParam.split(',')
-    const githubEnvVariables = getGithubEnvVariables(envVariablesNames)
+    const envVariables = getGithubEnvVariables(envVariablesNames)
 
-    const envFileName = core.getInput('platformatic_env_path') || '.env'
-    const envFilePath = join(pathToProject, envFileName)
-    const envFileVars = await getEnvFileVariables(envFilePath)
+    const label = isPullRequest
+      ? `github-pr:${githubMetadata.pullRequest.number}`
+      : `github-branch:${githubMetadata.branch.name}`
 
-    core.info('Merging environment variables')
-    const mergedEnvVars = { ...envFileVars, ...githubEnvVariables }
-
-    // TODO: remove after platformatic will read env vars control panel
-    if (Object.keys(githubEnvVariables).length > 0) {
-      await writeFile(envFilePath, serializeEnvVariables(mergedEnvVars))
+    const logger = {
+      info: core.info,
+      warn: core.warning
     }
 
-    const archivePath = join(pathToProject, '..', 'project.tar')
-    await archiveProject(pathToProject, archivePath)
-    core.info('Project has been successfully archived')
-
-    const fileData = await readFile(archivePath)
-    const bundleChecksum = generateMD5Hash(fileData)
-    const bundleSize = fileData.length
-
-    const label = `github-pr:${pullRequestDetails.number}`
-
-    const { token } = await createBundle(
+    const entryPointUrl = await deploy({
+      deployServiceHost,
       workspaceId,
       workspaceKey,
-      appType,
-      pullRequestDetails,
-      configPath,
-      bundleChecksum,
-      bundleSize
-    )
-
-    core.info('Uploading code archive to the cloud...')
-    await uploadCodeArchive(token, fileData, bundleSize, bundleChecksum)
-    core.info('Project has been successfully uploaded')
-
-    const { entryPointUrl } = await createDeployment(
-      workspaceId,
-      workspaceKey,
-      token,
+      pathToProject,
+      pathToConfig,
+      pathToEnvFile,
+      secrets,
+      variables: envVariables,
       label,
-      mergedEnvVars,
-      githubSecrets
-    )
-    core.info('Application has been successfully created')
-    core.info('Application URL: ' + entryPointUrl)
+      githubMetadata,
+      logger
+    })
 
-    try {
-      core.info('Making a prewarm application call...')
-      await makePrewarmRequest(entryPointUrl)
-      core.info('Application has been successfully prewarmed')
-    } catch (error) {
-      core.error('Could not make a prewarm call')
-      core.setFailed(error.message)
-      return
-    }
+    if (isPullRequest) {
+      const commitHash = githubMetadata.commit.sha
+      const commitUrl = githubMetadata.repository.url + '/commit/' + commitHash
+      const platformaticComment = createPlatformaticComment(entryPointUrl, commitHash, commitUrl)
 
-    const commitHash = pullRequestDetails.head.sha
-    const commitUrl = pullRequestDetails.base.repo.html_url + '/commit/' + commitHash
-    const platformaticComment = createPlatformaticComment(entryPointUrl, commitHash, commitUrl)
-
-    const lastCommentId = await findLastPlatformaticComment(octokit)
-    /* istanbul ignore next */
-    if (lastCommentId === null) {
-      await postPlatformaticComment(octokit, platformaticComment)
-    } else {
-      await updatePlatformaticComment(octokit, lastCommentId, platformaticComment)
+      const lastCommentId = await findLastPlatformaticComment(octokit)
+      /* istanbul ignore next */
+      if (lastCommentId === null) {
+        await postPlatformaticComment(octokit, platformaticComment)
+      } else {
+        await updatePlatformaticComment(octokit, lastCommentId, platformaticComment)
+      }
     }
 
     core.setOutput('platformatic_app_url', entryPointUrl)

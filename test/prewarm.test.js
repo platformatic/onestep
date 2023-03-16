@@ -43,6 +43,8 @@ test('prewarm request passes on second try', async (t) => {
 })
 
 test('prewarm throws error when all retries attempted', async (t) => {
+  t.plan(4)
+
   const svc = 'https://name-name-name-name.deploy.space'
   const warmMe = mockAgent.get(svc)
   warmMe.intercept({
@@ -50,8 +52,12 @@ test('prewarm throws error when all retries attempted', async (t) => {
     method: 'GET'
   }).reply(500, {})
 
+  const logger = {
+    warn: (message) => t.match(message, /Could not make a prewarm call/)
+  }
+
   await assert.rejects(
-    makePrewarmRequest(svc, 5), // maximum request attempts
+    makePrewarmRequest(svc, logger),
     /Could not make a prewarm call/
   )
   mockAgent.assertNoPendingInterceptors()

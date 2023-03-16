@@ -1,12 +1,6 @@
 'use strict'
 
-const { tmpdir } = require('os')
-const { join } = require('path')
-const { mkdtemp, readdir, rm } = require('fs/promises')
-
-const tar = require('tar')
 const { test, before } = require('tap')
-
 const { startDeployService, startMachine } = require('./helper.js')
 
 let execaNode = null
@@ -15,7 +9,7 @@ before(async (t) => {
   execaNode = execa.execaNode
 })
 
-test('action should successfully deploy platformatic project', async (t) => {
+test('action should successfully deploy platformatic project from pull_request context', async (t) => {
   t.plan(10)
 
   const bundleId = 'test-bundle-id'
@@ -92,6 +86,98 @@ test('action should successfully deploy platformatic project', async (t) => {
   await execaNode('execute.js', {
     cwd: __dirname,
     env: {
+      GITHUB_EVENT_NAME: 'pull_request',
+
+      INPUT_PLATFORMATIC_WORKSPACE_ID: workspaceId,
+      INPUT_PLATFORMATIC_WORKSPACE_KEY: workspaceKey,
+      INPUT_GITHUB_TOKEN: 'test',
+      INPUT_VARIABLES: 'ENV_VARIABLE_1,ENV_VARIABLE_2',
+      INPUT_SECRETS: 'ENV_VARIABLE_3',
+
+      ENV_VARIABLE_1: 'value1',
+      ENV_VARIABLE_2: 'value2',
+      ENV_VARIABLE_3: 'value3',
+      PLT_ENV_VARIABLE: 'value4',
+      IGNORED_ENV_VARIABLE: 'ignore'
+    }
+  })
+})
+
+test('action should successfully deploy platformatic project from push context', async (t) => {
+  t.plan(10)
+
+  const bundleId = 'test-bundle-id'
+  const token = 'test-upload-token'
+
+  const workspaceId = 'test-workspace-id'
+  const workspaceKey = 'test-workspace-key'
+
+  const entryPointUrl = await startMachine(t, () => {
+    t.pass('Action should make a prewarm request to the machine')
+  })
+
+  await startDeployService(
+    t,
+    {
+      createBundleCallback: (request, reply) => {
+        t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
+        t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
+        t.match(request.body, {
+          bundle: {
+            appType: 'db',
+            configPath: 'platformatic.db.json'
+          },
+          repository: {
+            name: 'test-repo-name',
+            url: 'https://github.com/test-github-user/test-repo-name',
+            githubRepoId: 1234
+          },
+          branch: {
+            name: 'test'
+          },
+          commit: {
+            sha: '1234',
+            username: 'test-github-user',
+            additions: 1,
+            deletions: 1
+          }
+        })
+        t.ok(request.body.bundle.checksum)
+        reply.code(200).send({ id: bundleId, token })
+      },
+      createDeploymentCallback: (request, reply) => {
+        t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
+        t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
+        t.equal(request.headers.authorization, `Bearer ${token}`)
+        t.same(
+          request.body,
+          {
+            label: 'github-branch:test',
+            variables: {
+              ENV_VARIABLE_1: 'value1',
+              ENV_VARIABLE_2: 'value2',
+              PLT_ENV_VARIABLE: 'value4',
+              PLT_ENV_VARIABLE1: 'platformatic_variable1',
+              PLT_ENV_VARIABLE2: 'platformatic_variable2'
+            },
+            secrets: {
+              ENV_VARIABLE_3: 'value3'
+            }
+          }
+        )
+        reply.code(200).send({ entryPointUrl })
+      },
+      uploadCallback: (request) => {
+        t.equal(request.headers.authorization, `Bearer ${token}`)
+      }
+    }
+  )
+
+  await execaNode('execute.js', {
+    cwd: __dirname,
+    env: {
+      GITHUB_EVENT_NAME: 'push',
+
       INPUT_PLATFORMATIC_WORKSPACE_ID: workspaceId,
       INPUT_PLATFORMATIC_WORKSPACE_KEY: workspaceKey,
       INPUT_GITHUB_TOKEN: 'test',
@@ -176,6 +262,8 @@ test('action should show a warning if platformatic dep is not in the dev section
   const child = await execaNode('execute.js', ['dev-dependency'], {
     cwd: __dirname,
     env: {
+      GITHUB_EVENT_NAME: 'pull_request',
+
       INPUT_PLATFORMATIC_WORKSPACE_ID: workspaceId,
       INPUT_PLATFORMATIC_WORKSPACE_KEY: workspaceKey,
       INPUT_GITHUB_TOKEN: 'test'
@@ -188,52 +276,15 @@ test('action should show a warning if platformatic dep is not in the dev section
   t.ok(outputLines.includes(warningMessage))
 })
 
-// TODO: remove this test
-test('action should create a .env file if it does not exist', async (t) => {
-  const bundleId = 'test-bundle-id'
-  const token = 'test-upload-token'
-
-  const entryPointUrl = await startMachine(t)
-
-  await startDeployService(t, {
-    createBundleCallback: (request, reply) => {
-      reply.code(200).send({ id: bundleId, token })
-    },
-    createDeploymentCallback: (request, reply) => {
-      reply.code(200).send({ entryPointUrl })
-    },
-    uploadCallback: async (request, reply) => {
-      const tmpDir = await mkdtemp(join(tmpdir(), 'action_env_'))
-      const stream = request.raw.pipe(tar.x({ strip: 1, C: tmpDir }))
-
-      t.teardown(async () => {
-        await rm(tmpDir, { recursive: true })
-      })
-
-      stream.on('finish', async () => {
-        const files = await readdir(tmpDir)
-        t.ok(files.includes('.env'))
-      })
-    }
-  })
-
-  await execaNode('execute.js', ['dev-dependency'], {
-    cwd: __dirname,
-    env: {
-      INPUT_PLATFORMATIC_WORKSPACE_ID: 'test-workspace-id',
-      INPUT_PLATFORMATIC_WORKSPACE_KEY: 'test-workspace-key',
-      INPUT_GITHUB_TOKEN: 'test',
-      PLT_ENV_VARIABLE1: 'value1'
-    }
-  })
-})
-
 test('action should fail if there is no platformatic_workspace_id input param', async (t) => {
   try {
     await execaNode('execute.js', {
       cwd: __dirname,
       env: {
-        INPUT_PLATFORMATIC_WORKSPACE_KEY: 'test-workspace-key'
+        GITHUB_EVENT_NAME: 'pull_request',
+
+        INPUT_PLATFORMATIC_WORKSPACE_KEY: 'test-workspace-key',
+        INPUT_GITHUB_TOKEN: 'test'
       }
     })
   } catch (err) {
@@ -249,7 +300,10 @@ test('action should fail if there is no platformatic_workspace_key input param',
     await execaNode('execute.js', {
       cwd: __dirname,
       env: {
-        INPUT_PLATFORMATIC_WORKSPACE_ID: 'test-workspace-id'
+        GITHUB_EVENT_NAME: 'pull_request',
+
+        INPUT_PLATFORMATIC_WORKSPACE_ID: 'test-workspace-id',
+        INPUT_GITHUB_TOKEN: 'test'
       }
     })
   } catch (err) {
@@ -274,6 +328,8 @@ test('action should fail if platformatic_api_key is wrong', async (t) => {
     await execaNode('execute.js', {
       cwd: __dirname,
       env: {
+        GITHUB_EVENT_NAME: 'pull_request',
+
         INPUT_PLATFORMATIC_WORKSPACE_ID: 'test-workspace-id',
         INPUT_PLATFORMATIC_WORKSPACE_KEY: 'test-workspace-key',
         INPUT_GITHUB_TOKEN: 'test',
@@ -302,6 +358,8 @@ test('action should fail if it could not create a bundle', async (t) => {
     await execaNode('execute.js', {
       cwd: __dirname,
       env: {
+        GITHUB_EVENT_NAME: 'pull_request',
+
         INPUT_PLATFORMATIC_WORKSPACE_ID: 'test-workspace-id',
         INPUT_PLATFORMATIC_WORKSPACE_KEY: 'test-workspace-key',
         INPUT_GITHUB_TOKEN: 'test',
@@ -333,6 +391,8 @@ test('action should fail if platformatic_api_key is wrong', async (t) => {
     await execaNode('execute.js', {
       cwd: __dirname,
       env: {
+        GITHUB_EVENT_NAME: 'pull_request',
+
         INPUT_PLATFORMATIC_WORKSPACE_ID: 'test-workspace-id',
         INPUT_PLATFORMATIC_WORKSPACE_KEY: 'test-workspace-key',
         INPUT_GITHUB_TOKEN: 'test',
@@ -343,7 +403,7 @@ test('action should fail if platformatic_api_key is wrong', async (t) => {
     t.equal(err.exitCode, 1)
 
     const lastLine = err.stdout.split('\n').pop()
-    t.equal(lastLine, '::error::Invalid platformatic_api_key provided')
+    t.equal(lastLine, '::error::Invalid platformatic_workspace_key provided')
   }
 })
 
@@ -361,6 +421,8 @@ test('action should fail if it could not create a deployment', async (t) => {
     await execaNode('execute.js', {
       cwd: __dirname,
       env: {
+        GITHUB_EVENT_NAME: 'pull_request',
+
         INPUT_PLATFORMATIC_WORKSPACE_ID: 'test-workspace-id',
         INPUT_PLATFORMATIC_WORKSPACE_KEY: 'test-workspace-key',
         INPUT_GITHUB_TOKEN: 'test',
@@ -386,6 +448,8 @@ test('action should fail if it could not upload code tarball', async (t) => {
     await execaNode('execute.js', {
       cwd: __dirname,
       env: {
+        GITHUB_EVENT_NAME: 'pull_request',
+
         INPUT_PLATFORMATIC_WORKSPACE_ID: 'test-workspace-id',
         INPUT_PLATFORMATIC_WORKSPACE_KEY: 'test-workspace-key',
         INPUT_GITHUB_TOKEN: 'test',
@@ -421,6 +485,8 @@ test('action should fail if it could not make a prewarm call', async (t) => {
     await execaNode('execute.js', {
       cwd: __dirname,
       env: {
+        GITHUB_EVENT_NAME: 'pull_request',
+
         INPUT_PLATFORMATIC_WORKSPACE_ID: 'test-workspace-id',
         INPUT_PLATFORMATIC_WORKSPACE_KEY: 'test-workspace-key',
         INPUT_GITHUB_TOKEN: 'test',
@@ -431,7 +497,7 @@ test('action should fail if it could not make a prewarm call', async (t) => {
     t.equal(err.exitCode, 1)
 
     const lastLine = err.stdout.split('\n').pop()
-    t.equal(lastLine, '::error::Could not make a prewarm call: 500 {"message":"Error"}')
+    t.equal(lastLine, '::error::Could not make a prewarm call: Request failed with status code: 500 {"message":"Error"}')
   }
 })
 
@@ -440,6 +506,8 @@ test('action should fail if there is no config file', async (t) => {
     await execaNode('execute.js', {
       cwd: __dirname,
       env: {
+        GITHUB_EVENT_NAME: 'pull_request',
+
         INPUT_PLATFORMATIC_WORKSPACE_ID: 'test-workspace-id',
         INPUT_PLATFORMATIC_WORKSPACE_KEY: 'test-workspace-key',
         INPUT_GITHUB_TOKEN: 'test',
@@ -459,6 +527,8 @@ test('action should fail it could not find a config file', async (t) => {
     await execaNode('execute.js', ['wrong-config-ext'], {
       cwd: __dirname,
       env: {
+        GITHUB_EVENT_NAME: 'pull_request',
+
         INPUT_PLATFORMATIC_WORKSPACE_ID: 'test-workspace-id',
         INPUT_PLATFORMATIC_WORKSPACE_KEY: 'test-workspace-key',
         INPUT_GITHUB_TOKEN: 'test'
@@ -477,6 +547,8 @@ test('action should fail if config file has wrong ext', async (t) => {
     await execaNode('execute.js', ['wrong-config-ext'], {
       cwd: __dirname,
       env: {
+        GITHUB_EVENT_NAME: 'pull_request',
+
         INPUT_PLATFORMATIC_WORKSPACE_ID: 'test-workspace-id',
         INPUT_PLATFORMATIC_WORKSPACE_KEY: 'test-workspace-key',
         INPUT_GITHUB_TOKEN: 'test',
@@ -491,18 +563,18 @@ test('action should fail if config file has wrong ext', async (t) => {
   }
 })
 
-test('action should fail if action is called not from pull request env', async (t) => {
+test('action should fail if action is called by unsupported event', async (t) => {
   try {
     await execaNode('execute.js', {
       cwd: __dirname,
       env: {
-        GITHUB_EVENT_PATH: 'skip'
+        GITHUB_EVENT_NAME: 'foo'
       }
     })
   } catch (err) {
     t.equal(err.exitCode, 1)
 
     const lastLine = err.stdout.split('\n').pop()
-    t.equal(lastLine, '::error::Action must be triggered by pull request')
+    t.equal(lastLine, '::error::The action only works on push and pull_request events')
   }
 })

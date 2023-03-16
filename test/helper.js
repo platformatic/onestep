@@ -7,6 +7,8 @@ const fastify = require('fastify')
 const nock = require('nock')
 
 async function createRepository (actionFolder, repositoryOptions = {}) {
+  const commitSha = '1234'
+
   const owner = repositoryOptions.owner || 'test-github-user'
   const repositoryName = repositoryOptions.name || 'test-repo-name'
 
@@ -14,34 +16,34 @@ async function createRepository (actionFolder, repositoryOptions = {}) {
   const prTitle = repositoryOptions.pullRequest?.title || 'Test PR title'
 
   const payload = {
+    after: commitSha,
     pull_request: {
-      number: prNumber,
-      base: {
-        repo: {
-          owner: {
-            login: owner
-          },
-          name: repositoryName
-        }
-      }
+      number: prNumber
     },
     repository: {
+      id: 1234,
       name: repositoryName,
       html_url: `https://github.com/${owner}/${repositoryName}`,
-      owner: {
-        login: owner
-      }
+      owner: { login: owner }
     }
   }
 
   const githubEventConfigPath = join(actionFolder, 'github_event.json')
   await writeFile(githubEventConfigPath, JSON.stringify(payload))
+
   process.env.GITHUB_EVENT_PATH = githubEventConfigPath
 
-  startGithubApi(owner, repositoryName, prNumber, prTitle)
+  const eventName = process.env.GITHUB_EVENT_NAME
+  if (eventName === 'pull_request') {
+    process.env.GITHUB_HEAD_REF = 'test'
+  } else if (eventName === 'push') {
+    process.env.GITHUB_REF_NAME = 'test'
+  }
+
+  startGithubApi(owner, repositoryName, commitSha, prNumber, prTitle)
 }
 
-function startGithubApi (owner, repositoryName, prNumber, prTitle) {
+function startGithubApi (owner, repositoryName, commitSha, prNumber, prTitle) {
   nock('https://api.github.com')
     .post(`/repos/${owner}/${repositoryName}/issues/${prNumber}/comments`)
     .reply(200, {})
@@ -52,25 +54,19 @@ function startGithubApi (owner, repositoryName, prNumber, prTitle) {
 
   nock('https://api.github.com')
     .get(`/repos/${owner}/${repositoryName}/pulls/${prNumber}`)
+    .reply(200, { title: prTitle, number: prNumber })
+
+  nock('https://api.github.com')
+    .get(`/repos/${owner}/${repositoryName}/commits/${commitSha}`)
     .reply(200, {
-      head: {
-        sha: '1234',
-        ref: 'test',
-        user: {
-          login: owner
-        }
+      sha: commitSha,
+      author: {
+        login: owner
       },
-      base: {
-        repo: {
-          id: 1234,
-          name: repositoryName,
-          html_url: `https://github.com/${owner}/${repositoryName}`
-        }
-      },
-      title: prTitle,
-      number: prNumber,
-      additions: 1,
-      deletions: 1
+      stats: {
+        additions: 1,
+        deletions: 1
+      }
     })
 }
 
