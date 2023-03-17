@@ -4,9 +4,9 @@ const { join } = require('path')
 
 const core = require('@actions/core')
 const github = require('@actions/github')
-require('dotenv').config({ path: join(__dirname, '.env') })
+const { deploy } = require('@platformatic/deploy-client')
 
-const { deploy } = require('./lib/deploy.js')
+require('dotenv').config({ path: join(__dirname, '.env') })
 
 const PLT_MESSAGE_REGEXP = /\*\*Your application was successfully deployed!\*\* :rocket:\nApplication url: (.*).*/
 
