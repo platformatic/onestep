@@ -16,10 +16,6 @@ async function createRepository (actionFolder, repositoryOptions = {}) {
   const prTitle = repositoryOptions.pullRequest?.title || 'Test PR title'
 
   const payload = {
-    after: commitSha,
-    pull_request: {
-      number: prNumber
-    },
     repository: {
       id: 1234,
       name: repositoryName,
@@ -28,17 +24,26 @@ async function createRepository (actionFolder, repositoryOptions = {}) {
     }
   }
 
+  const eventName = process.env.GITHUB_EVENT_NAME
+  if (eventName === 'pull_request') {
+    process.env.GITHUB_HEAD_REF = 'test'
+    payload.pull_request = {
+      number: prNumber,
+      head: {
+        sha: commitSha
+      }
+    }
+  } else if (eventName === 'push') {
+    process.env.GITHUB_REF_NAME = 'test'
+    payload.head_commit = {
+      id: commitSha
+    }
+  }
+
   const githubEventConfigPath = join(actionFolder, 'github_event.json')
   await writeFile(githubEventConfigPath, JSON.stringify(payload))
 
   process.env.GITHUB_EVENT_PATH = githubEventConfigPath
-
-  const eventName = process.env.GITHUB_EVENT_NAME
-  if (eventName === 'pull_request') {
-    process.env.GITHUB_HEAD_REF = 'test'
-  } else if (eventName === 'push') {
-    process.env.GITHUB_REF_NAME = 'test'
-  }
 
   startGithubApi(owner, repositoryName, commitSha, prNumber, prTitle)
 }
