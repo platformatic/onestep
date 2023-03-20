@@ -32,20 +32,17 @@ function getBranchMetadata () {
   return { name: branchName }
 }
 
-async function getHeadCommitMetadata (octokit) {
-  core.info(JSON.stringify(github, null, 2))
-  core.info(JSON.stringify(process.env, null, 2))
-
+async function getHeadCommitMetadata (octokit, commitSha) {
   const context = github.context.payload
 
   const { data: commitDetails } = await octokit.rest.repos.getCommit({
     owner: context.repository.owner.login,
     repo: context.repository.name,
-    ref: context.after
+    ref: commitSha
   })
 
   return {
-    sha: commitDetails.sha,
+    sha: commitSha,
     username: commitDetails.author.login,
     additions: commitDetails.stats.additions,
     deletions: commitDetails.stats.deletions
@@ -70,7 +67,12 @@ async function getPullRequestMetadata (octokit) {
 async function getGithubMetadata (octokit, isPullRequest) {
   const repositoryMetadata = getRepositoryMetadata()
   const branchMetadata = getBranchMetadata()
-  const commitMetadata = await getHeadCommitMetadata(octokit)
+
+  const commitSha = isPullRequest
+    ? github.context.payload.pull_request.head.sha
+    : github.context.payload.head_commit.id
+
+  const commitMetadata = await getHeadCommitMetadata(octokit, commitSha)
 
   const githubMetadata = {
     repository: repositoryMetadata,
