@@ -33,6 +33,9 @@ function getBranchMetadata () {
 }
 
 async function getHeadCommitMetadata (octokit) {
+  core.info(JSON.stringify(github, null, 2))
+  core.info(JSON.stringify(process.env, null, 2))
+
   const context = github.context.payload
 
   const { data: commitDetails } = await octokit.rest.repos.getCommit({
