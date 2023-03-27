@@ -7,6 +7,8 @@ const fastify = require('fastify')
 const nock = require('nock')
 
 async function createRepository (actionFolder, repositoryOptions = {}) {
+  const commitSha = '1234'
+
   const owner = repositoryOptions.owner || 'test-github-user'
   const repositoryName = repositoryOptions.name || 'test-repo-name'
 
@@ -14,34 +16,39 @@ async function createRepository (actionFolder, repositoryOptions = {}) {
   const prTitle = repositoryOptions.pullRequest?.title || 'Test PR title'
 
   const payload = {
-    pull_request: {
-      number: prNumber,
-      base: {
-        repo: {
-          owner: {
-            login: owner
-          },
-          name: repositoryName
-        }
-      }
-    },
     repository: {
+      id: 1234,
       name: repositoryName,
       html_url: `https://github.com/${owner}/${repositoryName}`,
-      owner: {
-        login: owner
+      owner: { login: owner }
+    }
+  }
+
+  const eventName = process.env.GITHUB_EVENT_NAME
+  if (eventName === 'pull_request') {
+    process.env.GITHUB_HEAD_REF = 'test'
+    payload.pull_request = {
+      number: prNumber,
+      head: {
+        sha: commitSha
       }
+    }
+  } else if (eventName === 'push') {
+    process.env.GITHUB_REF_NAME = 'test'
+    payload.head_commit = {
+      id: commitSha
     }
   }
 
   const githubEventConfigPath = join(actionFolder, 'github_event.json')
   await writeFile(githubEventConfigPath, JSON.stringify(payload))
+
   process.env.GITHUB_EVENT_PATH = githubEventConfigPath
 
-  startGithubApi(owner, repositoryName, prNumber, prTitle)
+  startGithubApi(owner, repositoryName, commitSha, prNumber, prTitle)
 }
 
-function startGithubApi (owner, repositoryName, prNumber, prTitle) {
+function startGithubApi (owner, repositoryName, commitSha, prNumber, prTitle) {
   nock('https://api.github.com')
     .post(`/repos/${owner}/${repositoryName}/issues/${prNumber}/comments`)
     .reply(200, {})
@@ -52,73 +59,60 @@ function startGithubApi (owner, repositoryName, prNumber, prTitle) {
 
   nock('https://api.github.com')
     .get(`/repos/${owner}/${repositoryName}/pulls/${prNumber}`)
+    .reply(200, { title: prTitle, number: prNumber })
+
+  nock('https://api.github.com')
+    .get(`/repos/${owner}/${repositoryName}/commits/${commitSha}`)
     .reply(200, {
-      head: {
-        sha: '1234',
-        ref: 'test',
-        repo: {
-          full_name: `${owner}/${repositoryName}`,
-          html_url: `https://github.com/${owner}/${repositoryName}`
-        },
-        user: {
-          login: owner
-        }
+      sha: commitSha,
+      author: {
+        login: owner
       },
-      title: prTitle,
-      number: prNumber,
-      additions: 1,
-      deletions: 1
+      stats: {
+        additions: 1,
+        deletions: 1
+      }
     })
 }
 
-async function startControlPanel (t, options = {}) {
-  const controlPanel = fastify({ keepAliveTimeout: 1 })
+async function startDeployService (t, options) {
+  const deployService = fastify({ keepAliveTimeout: 1 })
 
-  controlPanel.post('/bundles', async (request, reply) => {
+  deployService.post('/bundles', async (request, reply) => {
     const createBundleCallback = options.createBundleCallback || (() => {})
     await createBundleCallback(request, reply)
 
     return {
-      bundleId: 'default-bundle-id',
-      uploadToken: 'default-upload-token'
+      id: 'default-bundle-id',
+      token: 'default-upload-token'
     }
   })
 
-  controlPanel.post('/bundles/:bundleId/deployment', async (request, reply) => {
-    const createDeploymentCallback = options.createDeploymentCallback || (() => {})
+  deployService.post('/deployments', async (request, reply) => {
+    const createDeploymentCallback = options.createDeploymentCallback
     await createDeploymentCallback(request, reply)
-
-    return { url: 'http://localhost:3044' }
   })
 
-  t.teardown(async () => {
-    await controlPanel.close()
-  })
-  await controlPanel.listen({ port: 3042 })
-  return controlPanel
-}
-
-async function startHarry (t, uploadCallback = () => {}) {
-  const harry = fastify({ keepAliveTimeout: 1 })
-
-  harry.addContentTypeParser(
+  deployService.addContentTypeParser(
     'application/x-tar',
     { bodyLimit: 1024 * 1024 * 1024 },
     (request, payload, done) => done()
   )
 
-  harry.put('/upload', async (request, reply) => {
+  deployService.put('/upload', async (request, reply) => {
+    const uploadCallback = options.uploadCallback || (() => {})
     await uploadCallback(request, reply)
   })
 
   t.teardown(async () => {
-    await harry.close()
+    await deployService.close()
   })
-  await harry.listen({ port: 3043 })
-  return harry
+
+  await deployService.listen({ port: 3042 })
+  return deployService
 }
 
-async function startMachine (t, callback) {
+async function startMachine (t, callback = () => {}) {
   const machine = fastify({ keepAliveTimeout: 1 })
 
   machine.get('/', async (request, reply) => {
@@ -128,14 +122,12 @@ async function startMachine (t, callback) {
   t.teardown(async () => {
     await machine.close()
   })
-  await machine.listen({ port: 3044 })
-  return machine
+
+  return machine.listen({ port: 0 })
 }
 
 module.exports = {
   createRepository,
-  startControlPanel,
-  startHarry,
-  startMachine,
-  startGithubApi
+  startDeployService,
+  startMachine
 }

@@ -4,8 +4,11 @@ inputs:
   github_token:
     description: 'GitHub token'
     required: true
-  platformatic_api_key:
-    description: 'Platformatic API key'
+  platformatic_workspace_id:
+    description: 'Platformatic workspace ID'
+    required: true
+  platformatic_workspace_key:
+    description: 'Platformatic workspace key'
     required: true
   platformatic_config_path:
     description: 'Path to the Platformatic config file'
@@ -13,8 +16,11 @@ inputs:
   platformatic_env_path:
     description: 'Path to the Platformatic config file'
     required: false
-  allowed_env_vars:
-    description: 'Comma separated list of environment variables to be passed to the Platformatic DB application'
+  variables:
+    description: 'Comma separated list of environment variables to be passed to the Platformatic application'
+    required: false
+  secrets:
+    description: 'Comma separated list of environment secrets to be passed to the Platformatic application'
     required: false
 outputs:
   platformatic_app_url:
