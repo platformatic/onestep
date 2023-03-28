@@ -45,13 +45,13 @@ class DeployClient {
         accept: 'application/json'
       },
       body: JSON.stringify({
-        ...githubMetadata,
         bundle: {
           appType,
           configPath,
           checksum,
           size
-        }
+        },
+        githubMetadata
       })
     })
 

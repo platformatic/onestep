@@ -6,6 +6,87 @@ const { test } = require('tap')
 const { deploy } = require('../index')
 const { startMachine, startDeployService } = require('./helper')
 
+test('should deploy platformatic project without github metadata', async (t) => {
+  t.plan(10)
+
+  const bundleId = 'test-bundle-id'
+  const token = 'test-upload-token'
+
+  const workspaceId = 'test-workspace-id'
+  const workspaceKey = 'test-workspace-key'
+
+  const entryPointUrl = await startMachine(t, () => {
+    t.pass('Action should make a prewarm request to the machine')
+  })
+
+  const pathToProject = join(__dirname, 'fixtures', 'basic')
+  const pathToConfig = './platformatic.db.json'
+  const pathToEnvFile = './.env'
+
+  const label = 'github-pr:1'
+
+  const variables = {
+    ENV_VARIABLE_1: 'value1',
+    ENV_VARIABLE_2: 'value2',
+    PLT_ENV_VARIABLE: 'value4',
+    PLT_ENV_VARIABLE1: 'platformatic_variable1',
+    PLT_ENV_VARIABLE2: 'platformatic_variable2'
+  }
+
+  const secrets = {
+    ENV_VARIABLE_3: 'value3'
+  }
+
+  await startDeployService(
+    t,
+    {
+      createBundleCallback: (request, reply) => {
+        t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
+        t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
+        t.match(request.body, {
+          bundle: {
+            appType: 'db',
+            configPath: 'platformatic.db.json'
+          }
+        })
+        t.ok(request.body.bundle.checksum)
+        reply.code(200).send({ id: bundleId, token, isBundleUploaded: false })
+      },
+      createDeploymentCallback: (request, reply) => {
+        t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
+        t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
+        t.equal(request.headers.authorization, `Bearer ${token}`)
+        t.same(
+          request.body,
+          { label, variables, secrets }
+        )
+        reply.code(200).send({ entryPointUrl })
+      },
+      uploadCallback: (request) => {
+        t.equal(request.headers.authorization, `Bearer ${token}`)
+      }
+    }
+  )
+
+  const logger = {
+    info: () => {},
+    warn: () => t.fail('Should not log a warning')
+  }
+
+  await deploy({
+    deployServiceHost: 'http://localhost:3042',
+    workspaceId,
+    workspaceKey,
+    label,
+    pathToProject,
+    pathToConfig,
+    pathToEnvFile,
+    secrets,
+    variables,
+    logger
+  })
+})
+
 test('should successfully deploy platformatic project with PR context', async (t) => {
   t.plan(10)
 
@@ -69,7 +150,7 @@ test('should successfully deploy platformatic project with PR context', async (t
             appType: 'db',
             configPath: 'platformatic.db.json'
           },
-          ...githubMetadata
+          githubMetadata
         })
         t.ok(request.body.bundle.checksum)
         reply.code(200).send({ id: bundleId, token, isBundleUploaded: false })
@@ -169,7 +250,7 @@ test('should successfully deploy platformatic project with branch context', asyn
             appType: 'db',
             configPath: 'platformatic.db.json'
           },
-          ...githubMetadata
+          githubMetadata
         })
         t.ok(request.body.bundle.checksum)
         reply.code(200).send({ id: bundleId, token, isBundleUploaded: false })
@@ -350,7 +431,7 @@ test('should successfully deploy platformatic project with branch context', asyn
             appType: 'db',
             configPath: 'platformatic.db.json'
           },
-          ...githubMetadata
+          githubMetadata
         })
         t.ok(request.body.bundle.checksum)
         reply.code(200).send({ id: bundleId, token, isBundleUploaded: false })
@@ -450,7 +531,7 @@ test('should not deploy bundle of it already exists', async (t) => {
             appType: 'db',
             configPath: 'platformatic.db.json'
           },
-          ...githubMetadata
+          githubMetadata
         })
         t.ok(request.body.bundle.checksum)
         reply.code(200).send({ id: bundleId, token, isBundleUploaded: true })

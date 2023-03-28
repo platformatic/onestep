@@ -33,23 +33,25 @@ test('action should successfully deploy platformatic project from pull_request c
             appType: 'db',
             configPath: 'platformatic.db.json'
           },
-          repository: {
-            name: 'test-repo-name',
-            url: 'https://github.com/test-github-user/test-repo-name',
-            githubRepoId: 1234
-          },
-          branch: {
-            name: 'test'
-          },
-          commit: {
-            sha: '1234',
-            username: 'test-github-user',
-            additions: 1,
-            deletions: 1
-          },
-          pullRequest: {
-            number: 1,
-            title: 'Test PR title'
+          githubMetadata: {
+            repository: {
+              name: 'test-repo-name',
+              url: 'https://github.com/test-github-user/test-repo-name',
+              githubRepoId: 1234
+            },
+            branch: {
+              name: 'test'
+            },
+            commit: {
+              sha: '1234',
+              username: 'test-github-user',
+              additions: 1,
+              deletions: 1
+            },
+            pullRequest: {
+              number: 1,
+              title: 'Test PR title'
+            }
           }
         })
         t.ok(request.body.bundle.checksum)
@@ -127,19 +129,21 @@ test('action should successfully deploy platformatic project from push context',
             appType: 'db',
             configPath: 'platformatic.db.json'
           },
-          repository: {
-            name: 'test-repo-name',
-            url: 'https://github.com/test-github-user/test-repo-name',
-            githubRepoId: 1234
-          },
-          branch: {
-            name: 'test'
-          },
-          commit: {
-            sha: '1234',
-            username: 'test-github-user',
-            additions: 1,
-            deletions: 1
+          githubMetadata: {
+            repository: {
+              name: 'test-repo-name',
+              url: 'https://github.com/test-github-user/test-repo-name',
+              githubRepoId: 1234
+            },
+            branch: {
+              name: 'test'
+            },
+            commit: {
+              sha: '1234',
+              username: 'test-github-user',
+              additions: 1,
+              deletions: 1
+            }
           }
         })
         t.ok(request.body.bundle.checksum)
@@ -217,23 +221,25 @@ test('action should skip the bundle uploading if bundle already uploaded', async
             appType: 'db',
             configPath: 'platformatic.db.json'
           },
-          repository: {
-            name: 'test-repo-name',
-            url: 'https://github.com/test-github-user/test-repo-name',
-            githubRepoId: 1234
-          },
-          branch: {
-            name: 'test'
-          },
-          commit: {
-            sha: '1234',
-            username: 'test-github-user',
-            additions: 1,
-            deletions: 1
-          },
-          pullRequest: {
-            number: 1,
-            title: 'Test PR title'
+          githubMetadata: {
+            repository: {
+              name: 'test-repo-name',
+              url: 'https://github.com/test-github-user/test-repo-name',
+              githubRepoId: 1234
+            },
+            branch: {
+              name: 'test'
+            },
+            commit: {
+              sha: '1234',
+              username: 'test-github-user',
+              additions: 1,
+              deletions: 1
+            },
+            pullRequest: {
+              number: 1,
+              title: 'Test PR title'
+            }
           }
         })
         t.ok(request.body.bundle.checksum)
@@ -303,23 +309,25 @@ test('action should show a warning if platformatic dep is not in the dev section
             appType: 'db',
             configPath: 'platformatic.db.json'
           },
-          repository: {
-            name: 'test-repo-name',
-            url: 'https://github.com/test-github-user/test-repo-name',
-            githubRepoId: 1234
-          },
-          branch: {
-            name: 'test'
-          },
-          commit: {
-            sha: '1234',
-            username: 'test-github-user',
-            additions: 1,
-            deletions: 1
-          },
-          pullRequest: {
-            number: 1,
-            title: 'Test PR title'
+          githubMetadata: {
+            repository: {
+              name: 'test-repo-name',
+              url: 'https://github.com/test-github-user/test-repo-name',
+              githubRepoId: 1234
+            },
+            branch: {
+              name: 'test'
+            },
+            commit: {
+              sha: '1234',
+              username: 'test-github-user',
+              additions: 1,
+              deletions: 1
+            },
+            pullRequest: {
+              number: 1,
+              title: 'Test PR title'
+            }
           }
         })
         t.ok(request.body.bundle.checksum)
