@@ -11,7 +11,8 @@ async function startDeployService (t, options) {
 
     return {
       id: 'default-bundle-id',
-      token: 'default-upload-token'
+      token: 'default-upload-token',
+      isBundleUploaded: false
     }
   })
 
