@@ -72,7 +72,7 @@ test('should successfully deploy platformatic project with PR context', async (t
           ...githubMetadata
         })
         t.ok(request.body.bundle.checksum)
-        reply.code(200).send({ id: bundleId, token })
+        reply.code(200).send({ id: bundleId, token, isBundleUploaded: false })
       },
       createDeploymentCallback: (request, reply) => {
         t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
@@ -172,7 +172,7 @@ test('should successfully deploy platformatic project with branch context', asyn
           ...githubMetadata
         })
         t.ok(request.body.bundle.checksum)
-        reply.code(200).send({ id: bundleId, token })
+        reply.code(200).send({ id: bundleId, token, isBundleUploaded: false })
       },
       createDeploymentCallback: (request, reply) => {
         t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
@@ -254,7 +254,7 @@ test('should successfully deploy platformatic project without github metadata', 
           }
         })
         t.ok(request.body.bundle.checksum)
-        reply.code(200).send({ id: bundleId, token })
+        reply.code(200).send({ id: bundleId, token, isBundleUploaded: false })
       },
       createDeploymentCallback: (request, reply) => {
         t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
@@ -353,7 +353,7 @@ test('should successfully deploy platformatic project with branch context', asyn
           ...githubMetadata
         })
         t.ok(request.body.bundle.checksum)
-        reply.code(200).send({ id: bundleId, token })
+        reply.code(200).send({ id: bundleId, token, isBundleUploaded: false })
       },
       createDeploymentCallback: (request, reply) => {
         t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
@@ -367,6 +367,106 @@ test('should successfully deploy platformatic project with branch context', asyn
       },
       uploadCallback: (request) => {
         t.equal(request.headers.authorization, `Bearer ${token}`)
+      }
+    }
+  )
+
+  const logger = {
+    info: () => {},
+    warn: () => t.fail('Should not log a warning')
+  }
+
+  await deploy({
+    deployServiceHost: 'http://localhost:3042',
+    workspaceId,
+    workspaceKey,
+    label,
+    pathToProject,
+    pathToConfig,
+    pathToEnvFile,
+    secrets,
+    variables,
+    githubMetadata,
+    logger
+  })
+})
+
+test('should not deploy bundle of it already exists', async (t) => {
+  t.plan(9)
+
+  const bundleId = 'test-bundle-id'
+  const token = 'test-upload-token'
+
+  const workspaceId = 'test-workspace-id'
+  const workspaceKey = 'test-workspace-key'
+
+  const entryPointUrl = await startMachine(t, () => {
+    t.pass('Action should make a prewarm request to the machine')
+  })
+
+  const pathToProject = join(__dirname, 'fixtures', 'basic')
+  const pathToConfig = './platformatic.db.json'
+  const pathToEnvFile = './.env'
+
+  const label = 'github-pr:1'
+
+  const variables = {
+    ENV_VARIABLE_1: 'value1',
+    ENV_VARIABLE_2: 'value2',
+    PLT_ENV_VARIABLE: 'value4',
+    PLT_ENV_VARIABLE1: 'platformatic_variable1',
+    PLT_ENV_VARIABLE2: 'platformatic_variable2'
+  }
+
+  const secrets = {
+    ENV_VARIABLE_3: 'value3'
+  }
+
+  const githubMetadata = {
+    repository: {
+      name: 'test-repo-name',
+      url: 'https://github.com/test-github-user/test-repo-name',
+      githubRepoId: 1234
+    },
+    branch: {
+      name: 'test'
+    },
+    commit: {
+      sha: '1234',
+      username: 'test-github-user',
+      additions: 1,
+      deletions: 1
+    }
+  }
+
+  await startDeployService(
+    t,
+    {
+      createBundleCallback: (request, reply) => {
+        t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
+        t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
+        t.match(request.body, {
+          bundle: {
+            appType: 'db',
+            configPath: 'platformatic.db.json'
+          },
+          ...githubMetadata
+        })
+        t.ok(request.body.bundle.checksum)
+        reply.code(200).send({ id: bundleId, token, isBundleUploaded: true })
+      },
+      createDeploymentCallback: (request, reply) => {
+        t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
+        t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
+        t.equal(request.headers.authorization, `Bearer ${token}`)
+        t.same(
+          request.body,
+          { label, variables, secrets }
+        )
+        reply.code(200).send({ entryPointUrl })
+      },
+      uploadCallback: (request) => {
+        t.fail('Should not upload bundle')
       }
     }
   )
@@ -435,7 +535,7 @@ test('should successfully deploy platformatic project without github metadata', 
           }
         })
         t.ok(request.body.bundle.checksum)
-        reply.code(200).send({ id: bundleId, token })
+        reply.code(200).send({ id: bundleId, token, isBundleUploaded: false })
       },
       createDeploymentCallback: (request, reply) => {
         t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
@@ -516,7 +616,7 @@ test('should show a warning if platformatic dep is not in the dev section', asyn
           }
         })
         t.ok(request.body.bundle.checksum)
-        reply.code(200).send({ id: bundleId, token })
+        reply.code(200).send({ id: bundleId, token, isBundleUploaded: false })
       },
       createDeploymentCallback: (request, reply) => {
         t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
@@ -727,7 +827,7 @@ test('should fail if it could not make a prewarm call', async (t) => {
 
   await startDeployService(t, {
     createBundleCallback: (request, reply) => {
-      reply.code(200).send({ id: bundleId, token })
+      reply.code(200).send({ id: bundleId, token, isBundleUploaded: false })
     },
     createDeploymentCallback: (request, reply) => {
       reply.code(200).send({ entryPointUrl })
