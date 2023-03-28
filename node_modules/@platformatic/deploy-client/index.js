@@ -24,10 +24,6 @@ class DeployClient {
     this.deployServiceHost = deployServiceHost
     this.workspaceId = workspaceId
     this.workspaceKey = workspaceKey
-
-    this._bundleSize = null
-    this._bundleChecksum = null
-    this._sessionToken = null
   }
 
   async createBundle (
@@ -66,22 +62,18 @@ class DeployClient {
       throw new Error(`Could not create a bundle: ${statusCode}`)
     }
 
-    const { token } = await body.json()
-
-    this._sessionToken = token
-    this._bundleSize = size
-    this._bundleChecksum = checksum
+    return body.json()
   }
 
-  async uploadBundle (fileData) {
+  async uploadBundle (token, checksum, size, fileData) {
     const url = this.deployServiceHost + '/upload'
     const { statusCode } = await request(url, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/x-tar',
-        'Content-Length': this._bundleSize,
-        'Content-MD5': this._bundleChecksum,
-        authorization: `Bearer ${this._sessionToken}`
+        'Content-Length': size,
+        'Content-MD5': checksum,
+        authorization: `Bearer ${token}`
       },
       body: fileData,
       headersTimeout: 60 * 1000
@@ -92,7 +84,7 @@ class DeployClient {
     }
   }
 
-  async createDeployment (label, variables, secrets) {
+  async createDeployment (token, label, variables, secrets) {
     const url = this.deployServiceHost + '/deployments'
 
     const { statusCode, body } = await request(url, {
@@ -102,7 +94,7 @@ class DeployClient {
         'x-platformatic-api-key': this.workspaceKey,
         'content-type': 'application/json',
         'accept-encoding': '*',
-        authorization: `Bearer ${this._sessionToken}`,
+        authorization: `Bearer ${token}`,
         accept: 'application/json'
       },
 
@@ -251,7 +243,7 @@ async function deploy ({
   const bundleChecksum = generateMD5Hash(bundle)
   const bundleSize = bundle.length
 
-  await deployClient.createBundle(
+  const { token, isBundleUploaded } = await deployClient.createBundle(
     appType,
     pathToConfig,
     bundleChecksum,
@@ -259,9 +251,13 @@ async function deploy ({
     githubMetadata
   )
 
-  logger.info('Uploading bundle to the cloud...')
-  await deployClient.uploadBundle(bundle)
-  logger.info('Bundle has been successfully uploaded')
+  if (isBundleUploaded) {
+    logger.info('Bundle has been already uploaded. Skipping upload...')
+  } else {
+    logger.info('Uploading bundle to the cloud...')
+    await deployClient.uploadBundle(token, bundleChecksum, bundleSize, bundle)
+    logger.info('Bundle has been successfully uploaded')
+  }
 
   await rm(tmpDir, { recursive: true })
 
@@ -270,6 +266,7 @@ async function deploy ({
   const mergedEnvVars = { ...envFileVars, ...variables }
 
   const { entryPointUrl } = await deployClient.createDeployment(
+    token,
     label,
     mergedEnvVars,
     secrets
