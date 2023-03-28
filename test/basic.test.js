@@ -53,7 +53,7 @@ test('action should successfully deploy platformatic project from pull_request c
           }
         })
         t.ok(request.body.bundle.checksum)
-        reply.code(200).send({ id: bundleId, token })
+        reply.code(200).send({ id: bundleId, token, isBundleUploaded: false })
       },
       createDeploymentCallback: (request, reply) => {
         t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
@@ -143,7 +143,7 @@ test('action should successfully deploy platformatic project from push context',
           }
         })
         t.ok(request.body.bundle.checksum)
-        reply.code(200).send({ id: bundleId, token })
+        reply.code(200).send({ id: bundleId, token, isBundleUploaded: false })
       },
       createDeploymentCallback: (request, reply) => {
         t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
@@ -193,6 +193,92 @@ test('action should successfully deploy platformatic project from push context',
   })
 })
 
+test('action should skip the bundle uploading if bundle already uploaded', async (t) => {
+  t.plan(10)
+
+  const bundleId = 'test-bundle-id'
+  const token = 'test-upload-token'
+
+  const workspaceId = 'test-workspace-id'
+  const workspaceKey = 'test-workspace-key'
+
+  const entryPointUrl = await startMachine(t, () => {
+    t.pass('Action should make a prewarm request to the machine')
+  })
+
+  await startDeployService(
+    t,
+    {
+      createBundleCallback: (request, reply) => {
+        t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
+        t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
+        t.match(request.body, {
+          bundle: {
+            appType: 'db',
+            configPath: 'platformatic.db.json'
+          },
+          repository: {
+            name: 'test-repo-name',
+            url: 'https://github.com/test-github-user/test-repo-name',
+            githubRepoId: 1234
+          },
+          branch: {
+            name: 'test'
+          },
+          commit: {
+            sha: '1234',
+            username: 'test-github-user',
+            additions: 1,
+            deletions: 1
+          },
+          pullRequest: {
+            number: 1,
+            title: 'Test PR title'
+          }
+        })
+        t.ok(request.body.bundle.checksum)
+        reply.code(200).send({ id: bundleId, token, isBundleUploaded: true })
+      },
+      createDeploymentCallback: (request, reply) => {
+        t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
+        t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
+        t.equal(request.headers.authorization, `Bearer ${token}`)
+        t.same(
+          request.body,
+          {
+            label: 'github-pr:1',
+            variables: {
+              PLT_ENV_VARIABLE1: 'platformatic_variable1',
+              PLT_ENV_VARIABLE2: 'platformatic_variable2'
+            },
+            secrets: {}
+          }
+        )
+        reply.code(200).send({ entryPointUrl })
+      },
+      uploadCallback: (request) => {
+        t.fail('Action should not upload the bundle')
+      }
+    }
+  )
+
+  const child = await execaNode('execute.js', {
+    cwd: __dirname,
+    env: {
+      GITHUB_EVENT_NAME: 'pull_request',
+
+      INPUT_PLATFORMATIC_WORKSPACE_ID: workspaceId,
+      INPUT_PLATFORMATIC_WORKSPACE_KEY: workspaceKey,
+      INPUT_GITHUB_TOKEN: 'test'
+    }
+  })
+
+  const outputLines = child.stdout.split('\n')
+  const skippingUploadMessage = 'Bundle has been already uploaded. Skipping upload...'
+
+  t.ok(outputLines.includes(skippingUploadMessage))
+})
+
 test('action should show a warning if platformatic dep is not in the dev section', async (t) => {
   t.plan(11)
 
@@ -237,7 +323,7 @@ test('action should show a warning if platformatic dep is not in the dev section
           }
         })
         t.ok(request.body.bundle.checksum)
-        reply.code(200).send({ id: bundleId, token })
+        reply.code(200).send({ id: bundleId, token, isBundleUploaded: false })
       },
       createDeploymentCallback: (request, reply) => {
         t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
