@@ -214,7 +214,7 @@ async function run () {
 
     const label = isPullRequest
       ? `github-pr:${githubMetadata.pullRequest.number}`
-      : `github-branch:${githubMetadata.branch.name}`
+      : null
 
     const logger = {
       info: core.info,
