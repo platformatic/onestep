@@ -152,7 +152,7 @@ test('action should successfully deploy platformatic project from push context',
         t.same(
           request.body,
           {
-            label: 'github-branch:test',
+            label: null,
             variables: {
               ENV_VARIABLE_1: 'value1',
               ENV_VARIABLE_2: 'value2',
