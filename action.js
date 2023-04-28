@@ -193,7 +193,7 @@ async function run () {
     const pathToConfig = core.getInput('platformatic_config_path')
     const pathToEnvFile = core.getInput('platformatic_env_path')
 
-    const pathToProject = process.env.GITHUB_WORKSPACE
+    const pathToProject = core.getInput('platformatic_project_path') || '.'
     const deployServiceHost = process.env.DEPLOY_SERVICE_HOST
 
     const githubToken = core.getInput('github_token')

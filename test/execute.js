@@ -24,7 +24,7 @@ async function run () {
   }
 
   process.env = Object.assign({}, defaultEnvVars, process.env)
-  process.env.GITHUB_WORKSPACE = repositoryPath
+  process.env[`INPUT_${'platformatic_project_path'.replace(/ /g, '_').toUpperCase()}`] = repositoryPath
 
   try {
     const executeAction = require('../action.js')

@@ -10,6 +10,9 @@ inputs:
   platformatic_workspace_key:
     description: 'Platformatic workspace key'
     required: true
+  platformatic_project_path:
+    description: 'Path to the Platformatic application project'
+    required: false
   platformatic_config_path:
     description: 'Path to the Platformatic config file'
     required: false
