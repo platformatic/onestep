@@ -8,8 +8,8 @@ name: Deploy Platformatic DB application to the cloud
 on:
   pull_request:
     paths-ignore:
-      - 'docs/**'
-      - '**.md'
+      - "docs/**"
+      - "**.md"
 
 jobs:
   build_and_deploy:
@@ -36,4 +36,16 @@ jobs:
           custom_variable1: test2
           custom_variable2: test3
           custom_secret1: test5
+```
+
+## Monorepo/Subdirectory support
+
+Use the [`jobs.<job_id>.defaults.run.working-directory`](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#defaultsrun) to specify the subdirectory of the project to deploy, this will ensure that all commands are run from the correct directory.
+
+```yml
+jobs:
+  build_and_deploy:
+    defaults:
+      run:
+        working-directory: <subdirectory>
 ```
