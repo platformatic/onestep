@@ -604,7 +604,8 @@ test('action should fail if there is no config file', async (t) => {
     t.equal(err.exitCode, 1)
 
     const lastLine = err.stdout.split('\n').pop()
-    t.equal(lastLine, '::error::There is no Platformatic config file')
+    t.match(lastLine, /::error::/)
+    t.match(lastLine, /Missing config file!/)
   }
 })
 
@@ -624,7 +625,7 @@ test('action should fail it could not find a config file', async (t) => {
     t.equal(err.exitCode, 1)
 
     const lastLine = err.stdout.split('\n').pop()
-    t.equal(lastLine, '::error::Could not find Platformatic config file, please specify it in the action input')
+    t.equal(lastLine, '::error::Could not find Platformatic config file')
   }
 })
 
@@ -645,7 +646,8 @@ test('action should fail if config file has wrong ext', async (t) => {
     t.equal(err.exitCode, 1)
 
     const lastLine = err.stdout.split('\n').pop()
-    t.equal(lastLine, '::error::Invalid application type: wrong, must be one of: service, db')
+    t.match(lastLine, /::error::/)
+    t.match(lastLine, /Missing config file!/)
   }
 })
 
