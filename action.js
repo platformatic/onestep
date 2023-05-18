@@ -235,7 +235,9 @@ async function run () {
       logger
     })
 
-    if (isPullRequest) {
+    const postPrComment = core.getInput('post_pr_comment') === 'true'
+
+    if (isPullRequest && postPrComment) {
       const commitHash = githubMetadata.commit.sha
       const commitUrl = githubMetadata.repository.url + '/commit/' + commitHash
       const platformaticComment = createPlatformaticComment(entryPointUrl, commitHash, commitUrl)
