@@ -22,6 +22,10 @@ inputs:
   secrets:
     description: 'Comma separated list of environment secrets to be passed to the Platformatic application'
     required: false
+  post_pr_comment:
+    description: 'Configure whether comments with preview app URLs are posted on pull requests'
+    required: false
+    default: true
 outputs:
   platformatic_app_url:
     description: 'URL of the deployed Platformatic DB application'
