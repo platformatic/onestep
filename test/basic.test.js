@@ -10,7 +10,7 @@ before(async (t) => {
 })
 
 test('action should successfully deploy platformatic project from pull_request context', async (t) => {
-  t.plan(10)
+  t.plan(15)
 
   const bundleId = 'test-bundle-id'
   const token = 'test-upload-token'
@@ -28,31 +28,35 @@ test('action should successfully deploy platformatic project from pull_request c
       createBundleCallback: (request, reply) => {
         t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
         t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
-        t.match(request.body, {
-          bundle: {
-            appType: 'db',
-            configPath: 'platformatic.db.json'
-          },
-          repository: {
-            name: 'test-repo-name',
-            url: 'https://github.com/test-github-user/test-repo-name',
-            githubRepoId: 1234
-          },
-          branch: {
-            name: 'test'
-          },
-          commit: {
-            sha: '1234',
-            username: 'test-github-user',
-            additions: 1,
-            deletions: 1
-          },
-          pullRequest: {
-            number: 1,
-            title: 'Test PR title'
-          }
+
+        const { bundle, repository, branch, commit, pullRequest } = request.body
+
+        t.equal(bundle.appType, 'db')
+        t.equal(bundle.configPath, 'platformatic.db.json')
+        t.ok(bundle.checksum)
+
+        t.same(repository, {
+          name: 'test-repo-name',
+          url: 'https://github.com/test-github-user/test-repo-name',
+          githubRepoId: 1234
         })
-        t.ok(request.body.bundle.checksum)
+
+        t.same(branch, {
+          name: 'test'
+        })
+
+        t.same(commit, {
+          sha: '1234',
+          username: 'test-github-user',
+          additions: 1,
+          deletions: 1
+        })
+
+        t.same(pullRequest, {
+          number: 1,
+          title: 'Test PR title'
+        })
+
         reply.code(200).send({ id: bundleId, token, isBundleUploaded: false })
       },
       createDeploymentCallback: (request, reply) => {
@@ -104,7 +108,7 @@ test('action should successfully deploy platformatic project from pull_request c
 })
 
 test('action should successfully deploy platformatic project from push context', async (t) => {
-  t.plan(10)
+  t.plan(14)
 
   const bundleId = 'test-bundle-id'
   const token = 'test-upload-token'
@@ -122,27 +126,30 @@ test('action should successfully deploy platformatic project from push context',
       createBundleCallback: (request, reply) => {
         t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
         t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
-        t.match(request.body, {
-          bundle: {
-            appType: 'db',
-            configPath: 'platformatic.db.json'
-          },
-          repository: {
-            name: 'test-repo-name',
-            url: 'https://github.com/test-github-user/test-repo-name',
-            githubRepoId: 1234
-          },
-          branch: {
-            name: 'test'
-          },
-          commit: {
-            sha: '1234',
-            username: 'test-github-user',
-            additions: 1,
-            deletions: 1
-          }
+
+        const { bundle, repository, branch, commit } = request.body
+
+        t.equal(bundle.appType, 'db')
+        t.equal(bundle.configPath, 'platformatic.db.json')
+        t.ok(bundle.checksum)
+
+        t.same(repository, {
+          name: 'test-repo-name',
+          url: 'https://github.com/test-github-user/test-repo-name',
+          githubRepoId: 1234
         })
-        t.ok(request.body.bundle.checksum)
+
+        t.same(branch, {
+          name: 'test'
+        })
+
+        t.same(commit, {
+          sha: '1234',
+          username: 'test-github-user',
+          additions: 1,
+          deletions: 1
+        })
+
         reply.code(200).send({ id: bundleId, token, isBundleUploaded: false })
       },
       createDeploymentCallback: (request, reply) => {
@@ -194,7 +201,7 @@ test('action should successfully deploy platformatic project from push context',
 })
 
 test('action should skip the bundle uploading if bundle already uploaded', async (t) => {
-  t.plan(10)
+  t.plan(15)
 
   const bundleId = 'test-bundle-id'
   const token = 'test-upload-token'
@@ -212,31 +219,35 @@ test('action should skip the bundle uploading if bundle already uploaded', async
       createBundleCallback: (request, reply) => {
         t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
         t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
-        t.match(request.body, {
-          bundle: {
-            appType: 'db',
-            configPath: 'platformatic.db.json'
-          },
-          repository: {
-            name: 'test-repo-name',
-            url: 'https://github.com/test-github-user/test-repo-name',
-            githubRepoId: 1234
-          },
-          branch: {
-            name: 'test'
-          },
-          commit: {
-            sha: '1234',
-            username: 'test-github-user',
-            additions: 1,
-            deletions: 1
-          },
-          pullRequest: {
-            number: 1,
-            title: 'Test PR title'
-          }
+
+        const { bundle, repository, branch, commit, pullRequest } = request.body
+
+        t.equal(bundle.appType, 'db')
+        t.equal(bundle.configPath, 'platformatic.db.json')
+        t.ok(bundle.checksum)
+
+        t.same(repository, {
+          name: 'test-repo-name',
+          url: 'https://github.com/test-github-user/test-repo-name',
+          githubRepoId: 1234
         })
-        t.ok(request.body.bundle.checksum)
+
+        t.same(branch, {
+          name: 'test'
+        })
+
+        t.same(commit, {
+          sha: '1234',
+          username: 'test-github-user',
+          additions: 1,
+          deletions: 1
+        })
+
+        t.same(pullRequest, {
+          number: 1,
+          title: 'Test PR title'
+        })
+
         reply.code(200).send({ id: bundleId, token, isBundleUploaded: true })
       },
       createDeploymentCallback: (request, reply) => {
@@ -280,7 +291,7 @@ test('action should skip the bundle uploading if bundle already uploaded', async
 })
 
 test('action should show a warning if platformatic dep is not in the dev section', async (t) => {
-  t.plan(11)
+  t.plan(16)
 
   const bundleId = 'test-bundle-id'
   const token = 'test-upload-token'
@@ -298,31 +309,35 @@ test('action should show a warning if platformatic dep is not in the dev section
       createBundleCallback: (request, reply) => {
         t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
         t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
-        t.match(request.body, {
-          bundle: {
-            appType: 'db',
-            configPath: 'platformatic.db.json'
-          },
-          repository: {
-            name: 'test-repo-name',
-            url: 'https://github.com/test-github-user/test-repo-name',
-            githubRepoId: 1234
-          },
-          branch: {
-            name: 'test'
-          },
-          commit: {
-            sha: '1234',
-            username: 'test-github-user',
-            additions: 1,
-            deletions: 1
-          },
-          pullRequest: {
-            number: 1,
-            title: 'Test PR title'
-          }
+
+        const { bundle, repository, branch, commit, pullRequest } = request.body
+
+        t.equal(bundle.appType, 'db')
+        t.equal(bundle.configPath, 'platformatic.db.json')
+        t.ok(bundle.checksum)
+
+        t.same(repository, {
+          name: 'test-repo-name',
+          url: 'https://github.com/test-github-user/test-repo-name',
+          githubRepoId: 1234
         })
-        t.ok(request.body.bundle.checksum)
+
+        t.same(branch, {
+          name: 'test'
+        })
+
+        t.same(commit, {
+          sha: '1234',
+          username: 'test-github-user',
+          additions: 1,
+          deletions: 1
+        })
+
+        t.same(pullRequest, {
+          number: 1,
+          title: 'Test PR title'
+        })
+
         reply.code(200).send({ id: bundleId, token, isBundleUploaded: false })
       },
       createDeploymentCallback: (request, reply) => {
