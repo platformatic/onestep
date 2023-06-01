@@ -67,6 +67,9 @@ test('action should successfully deploy platformatic project from pull_request c
           request.body,
           {
             label: 'github-pr:1',
+            metadata: {
+              appType: 'db'
+            },
             variables: {
               ENV_VARIABLE_1: 'value1',
               ENV_VARIABLE_2: 'value2',
@@ -160,6 +163,9 @@ test('action should successfully deploy platformatic project from push context',
           request.body,
           {
             label: null,
+            metadata: {
+              appType: 'db'
+            },
             variables: {
               ENV_VARIABLE_1: 'value1',
               ENV_VARIABLE_2: 'value2',
@@ -258,6 +264,9 @@ test('action should skip the bundle uploading if bundle already uploaded', async
           request.body,
           {
             label: 'github-pr:1',
+            metadata: {
+              appType: 'db'
+            },
             variables: {
               PLT_ENV_VARIABLE1: 'platformatic_variable1',
               PLT_ENV_VARIABLE2: 'platformatic_variable2'
@@ -348,6 +357,9 @@ test('action should show a warning if platformatic dep is not in the dev section
           request.body,
           {
             label: 'github-pr:1',
+            metadata: {
+              appType: 'db'
+            },
             variables: {},
             secrets: {}
           }
