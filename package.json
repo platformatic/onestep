@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "lint": "standard .",
-    "test": "npm run lint && tap -j1 test/*.test.js"
+    "test": "npm run lint && tap --no-cov -j1 test/*.test.js"
   },
   "repository": {
     "type": "git",
@@ -27,7 +27,7 @@
   "dependencies": {
     "@actions/core": "^1.10.0",
     "@actions/github": "^5.1.1",
-    "@platformatic/deploy-client": "0.26.0",
+    "@platformatic/deploy-client": "^0.30.1",
     "dotenv": "^16.0.3"
   }
 }
