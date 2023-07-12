@@ -18,7 +18,7 @@
   },
   "homepage": "https://github.com/platformatic/onestep#readme",
   "devDependencies": {
-    "execa": "^6.1.0",
+    "execa": "^7.0.0",
     "fastify": "^4.11.0",
     "nock": "^13.3.0",
     "standard": "^17.0.0",
