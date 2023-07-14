@@ -26,7 +26,7 @@ jobs:
 
       - name: Deploy app
         id: deploy-app
-        uses: platformatic/onestep@v1.1.0
+        uses: platformatic/onestep@latest
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           platformatic_workspace_id: ${{ vars.PLATFORMATIC_WORKSPACE_ID }}
