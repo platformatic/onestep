@@ -27,6 +27,7 @@ async function createRepository (actionFolder, repositoryOptions = {}) {
   const eventName = process.env.GITHUB_EVENT_NAME
   if (eventName === 'pull_request') {
     process.env.GITHUB_HEAD_REF = 'test'
+    process.env.GITHUB_REF_NAME = ''
     payload.pull_request = {
       number: prNumber,
       head: {
@@ -35,6 +36,7 @@ async function createRepository (actionFolder, repositoryOptions = {}) {
     }
   } else if (eventName === 'push') {
     process.env.GITHUB_REF_NAME = 'test'
+    process.env.GITHUB_HEAD_REF = ''
     payload.head_commit = {
       id: commitSha
     }
