@@ -1,6 +1,6 @@
 'use strict'
 
-const { join } = require('path')
+const { join } = require('node:path')
 
 const core = require('@actions/core')
 const github = require('@actions/github')
@@ -193,7 +193,9 @@ async function run () {
     const pathToConfig = core.getInput('platformatic_config_path')
     const pathToEnvFile = core.getInput('platformatic_env_path')
 
-    const pathToProject = process.env.GITHUB_WORKSPACE
+    const subfolderPath = core.getInput('platformatic_project_path') || ''
+    const pathToProject = join(process.env.GITHUB_WORKSPACE, subfolderPath)
+
     const deployServiceHost = process.env.DEPLOY_SERVICE_HOST
 
     const githubToken = core.getInput('github_token')

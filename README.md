@@ -44,3 +44,15 @@ jobs:
       - name: Output deployed app URL
         run: echo '${{ steps.deploy-app.outputs.platformatic_app_url }}'
 ```
+
+## Monorepo/Subdirectory support
+
+Use the [`jobs.<job_id>.defaults.run.working-directory`](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#defaultsrun) to specify the subdirectory of the project to deploy, this will ensure that all commands are run from the correct directory.
+
+```yml
+jobs:
+  build_and_deploy:
+    defaults:
+      run:
+        working-directory: <subdirectory>
+```
