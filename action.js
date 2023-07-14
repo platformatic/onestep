@@ -6,13 +6,13 @@ const core = require('@actions/core')
 const github = require('@actions/github')
 const { deploy } = require('@platformatic/deploy-client')
 
-require('dotenv').config({ path: join(__dirname, '.env') })
-
 const PLT_MESSAGE_REGEXP = /\*\*Your application was successfully deployed!\*\* :rocket:\nApplication url: (.*).*/
 
 // TODO: move port and database_url to secrets
 const PLATFORMATIC_VARIABLES = ['PORT', 'DATABASE_URL']
 const PLATFORMATIC_SECRETS = []
+
+const PROD_DEPLOY_SERVICE_HOST = 'https://plt-production-deploy-service.fly.dev'
 
 function getRepositoryMetadata () {
   const context = github.context.payload
@@ -196,7 +196,8 @@ async function run () {
     const subfolderPath = core.getInput('platformatic_project_path') || ''
     const pathToProject = join(process.env.GITHUB_WORKSPACE, subfolderPath)
 
-    const deployServiceHost = process.env.DEPLOY_SERVICE_HOST
+    const deployServiceHost = process.env.DEPLOY_SERVICE_HOST ||
+      PROD_DEPLOY_SERVICE_HOST
 
     const githubToken = core.getInput('github_token')
     const octokit = github.getOctokit(githubToken)
