@@ -220,6 +220,7 @@ async function run () {
       : null
 
     const logger = {
+      trace: () => {},
       info: core.info,
       warn: core.warning
     }
