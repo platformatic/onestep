@@ -63,13 +63,13 @@ function startGithubApi (owner, repositoryName, commitSha, prNumber, prTitle) {
     .get(`/repos/${owner}/${repositoryName}/pulls/${prNumber}`)
     .reply(200, { title: prTitle, number: prNumber })
 
+  const commitAuthor = process.env.UNKNOWN_COMMIT_AUTHOR ? null : { login: owner }
+
   nock('https://api.github.com')
     .get(`/repos/${owner}/${repositoryName}/commits/${commitSha}`)
     .reply(200, {
       sha: commitSha,
-      author: {
-        login: owner
-      },
+      author: commitAuthor,
       stats: {
         additions: 1,
         deletions: 1
