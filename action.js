@@ -41,6 +41,8 @@ async function getHeadCommitMetadata (octokit, commitSha) {
     ref: commitSha
   })
 
+  core.info(JSON.stringify(commitDetails, null, 2))
+
   return {
     sha: commitSha,
     username: commitDetails.author.login,
@@ -182,6 +184,10 @@ async function updatePlatformaticComment (octokit, commentId, comment) {
 
 async function run () {
   try {
+    core.info('-----------------------------------------------')
+    core.info(JSON.stringify(github.context.payload, null, 2))
+    core.info('-----------------------------------------------')
+
     const eventName = process.env.GITHUB_EVENT_NAME
     if (eventName !== 'push' && eventName !== 'pull_request') {
       throw new Error('The action only works on push and pull_request events')
