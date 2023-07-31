@@ -43,7 +43,7 @@ async function getHeadCommitMetadata (octokit, commitSha) {
 
   return {
     sha: commitSha,
-    username: commitDetails.author.login,
+    username: commitDetails.author?.login || null,
     additions: commitDetails.stats.additions,
     deletions: commitDetails.stats.deletions
   }
