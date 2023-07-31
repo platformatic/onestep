@@ -491,6 +491,103 @@ test('action should show a warning if platformatic dep is not in the dev section
   t.ok(outputLines.includes(warningMessage))
 })
 
+test('action should successfully deploy platformatic project from push context', async (t) => {
+  t.plan(14)
+
+  const bundleId = 'test-bundle-id'
+  const token = 'test-upload-token'
+
+  const workspaceId = 'test-workspace-id'
+  const workspaceKey = 'test-workspace-key'
+
+  const entryPointUrl = await startMachine(t, () => {
+    t.pass('Action should make a prewarm request to the machine')
+  })
+
+  await startDeployService(
+    t,
+    {
+      createBundleCallback: (request, reply) => {
+        t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
+        t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
+
+        const { bundle, repository, branch, commit } = request.body
+
+        t.equal(bundle.appType, 'db')
+        t.equal(bundle.configPath, 'platformatic.db.json')
+        t.ok(bundle.checksum)
+
+        t.same(repository, {
+          name: 'test-repo-name',
+          url: 'https://github.com/test-github-user/test-repo-name',
+          githubRepoId: 1234
+        })
+
+        t.same(branch, {
+          name: 'test'
+        })
+
+        t.same(commit, {
+          sha: '1234',
+          username: null,
+          additions: 1,
+          deletions: 1
+        })
+
+        reply.code(200).send({ id: bundleId, token, isBundleUploaded: false })
+      },
+      createDeploymentCallback: (request, reply) => {
+        t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
+        t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
+        t.equal(request.headers.authorization, `Bearer ${token}`)
+        t.same(
+          request.body,
+          {
+            label: null,
+            metadata: {
+              appType: 'db'
+            },
+            variables: {
+              ENV_VARIABLE_1: 'value1',
+              ENV_VARIABLE_2: 'value2',
+              PLT_ENV_VARIABLE: 'value4',
+              PLT_ENV_VARIABLE1: 'platformatic_variable1',
+              PLT_ENV_VARIABLE2: 'platformatic_variable2'
+            },
+            secrets: {
+              ENV_VARIABLE_3: 'value3'
+            }
+          }
+        )
+        reply.code(200).send({ entryPointUrl })
+      },
+      uploadCallback: (request) => {
+        t.equal(request.headers.authorization, `Bearer ${token}`)
+      }
+    }
+  )
+
+  await execaNode('execute.js', {
+    cwd: __dirname,
+    env: {
+      UNKNOWN_COMMIT_AUTHOR: true,
+      GITHUB_EVENT_NAME: 'push',
+
+      INPUT_PLATFORMATIC_WORKSPACE_ID: workspaceId,
+      INPUT_PLATFORMATIC_WORKSPACE_KEY: workspaceKey,
+      INPUT_GITHUB_TOKEN: 'test',
+      INPUT_VARIABLES: 'ENV_VARIABLE_1,ENV_VARIABLE_2',
+      INPUT_SECRETS: 'ENV_VARIABLE_3',
+
+      ENV_VARIABLE_1: 'value1',
+      ENV_VARIABLE_2: 'value2',
+      ENV_VARIABLE_3: 'value3',
+      PLT_ENV_VARIABLE: 'value4',
+      IGNORED_ENV_VARIABLE: 'ignore'
+    }
+  })
+})
+
 test('action should fail if there is no platformatic_workspace_id input param', async (t) => {
   try {
     await execaNode('execute.js', {
