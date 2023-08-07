@@ -222,7 +222,8 @@ async function run () {
     const logger = {
       trace: () => {},
       info: core.info,
-      warn: core.warning
+      warn: core.warning,
+      error: core.error
     }
 
     const entryPointUrl = await deploy({
