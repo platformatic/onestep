@@ -855,26 +855,104 @@ test('action should fail it could not find a config file', async (t) => {
   }
 })
 
-test('action should fail if config file has wrong ext', async (t) => {
-  try {
-    await execaNode('execute.js', ['wrong-config-ext'], {
-      cwd: __dirname,
-      env: {
-        GITHUB_EVENT_NAME: 'pull_request',
+test('action should successfully deploy platformatic project with a custom config ext', async (t) => {
+  t.plan(15)
 
-        INPUT_PLATFORMATIC_WORKSPACE_ID: 'test-workspace-id',
-        INPUT_PLATFORMATIC_WORKSPACE_KEY: 'test-workspace-key',
-        INPUT_GITHUB_TOKEN: 'test',
-        INPUT_PLATFORMATIC_CONFIG_PATH: './platformatic.wrong.json'
+  const bundleId = 'test-bundle-id'
+  const token = 'test-upload-token'
+
+  const workspaceId = 'test-workspace-id'
+  const workspaceKey = 'test-workspace-key'
+
+  const entryPointUrl = await startMachine(t, () => {
+    t.pass('Action should make a prewarm request to the machine')
+  })
+
+  await startDeployService(
+    t,
+    {
+      createBundleCallback: (request, reply) => {
+        t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
+        t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
+
+        const { bundle, repository, branch, commit, pullRequest } = request.body
+
+        t.equal(bundle.appType, 'db')
+        t.equal(bundle.configPath, './platformatic.wrong.json')
+        t.ok(bundle.checksum)
+
+        t.same(repository, {
+          name: 'test-repo-name',
+          url: 'https://github.com/test-github-user/test-repo-name',
+          githubRepoId: 1234
+        })
+
+        t.same(branch, {
+          name: 'test'
+        })
+
+        t.same(commit, {
+          sha: '1234',
+          username: 'test-github-user',
+          additions: 1,
+          deletions: 1
+        })
+
+        t.same(pullRequest, {
+          number: 1,
+          title: 'Test PR title'
+        })
+
+        reply.code(200).send({ id: bundleId, token, isBundleUploaded: false })
+      },
+      createDeploymentCallback: (request, reply) => {
+        t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
+        t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
+        t.equal(request.headers.authorization, `Bearer ${token}`)
+        t.same(
+          request.body,
+          {
+            label: 'github-pr:1',
+            metadata: {
+              appType: 'db'
+            },
+            variables: {
+              ENV_VARIABLE_1: 'value1',
+              ENV_VARIABLE_2: 'value2',
+              PLT_ENV_VARIABLE: 'value4'
+            },
+            secrets: {
+              ENV_VARIABLE_3: 'value3'
+            }
+          }
+        )
+        reply.code(200).send({ entryPointUrl })
+      },
+      uploadCallback: (request) => {
+        t.equal(request.headers.authorization, `Bearer ${token}`)
       }
-    })
-  } catch (err) {
-    t.equal(err.exitCode, 1)
+    }
+  )
 
-    const lastLine = err.stdout.split('\n').pop()
-    t.match(lastLine, /::error::/)
-    t.match(lastLine, /Missing config file!/)
-  }
+  await execaNode('execute.js', ['wrong-config-ext'], {
+    cwd: __dirname,
+    env: {
+      GITHUB_EVENT_NAME: 'pull_request',
+
+      INPUT_PLATFORMATIC_WORKSPACE_ID: workspaceId,
+      INPUT_PLATFORMATIC_WORKSPACE_KEY: workspaceKey,
+      INPUT_GITHUB_TOKEN: 'test',
+      INPUT_PLATFORMATIC_CONFIG_PATH: './platformatic.wrong.json',
+      INPUT_VARIABLES: 'ENV_VARIABLE_1,ENV_VARIABLE_2',
+      INPUT_SECRETS: 'ENV_VARIABLE_3',
+
+      ENV_VARIABLE_1: 'value1',
+      ENV_VARIABLE_2: 'value2',
+      ENV_VARIABLE_3: 'value3',
+      PLT_ENV_VARIABLE: 'value4',
+      IGNORED_ENV_VARIABLE: 'ignore'
+    }
+  })
 })
 
 test('action should fail if action is called by unsupported event', async (t) => {
