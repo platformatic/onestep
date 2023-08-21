@@ -226,7 +226,7 @@ async function run () {
       error: core.error
     }
 
-    const entryPointUrl = await deploy({
+    const { entryPointUrl } = await deploy({
       deployServiceHost,
       workspaceId,
       workspaceKey,
