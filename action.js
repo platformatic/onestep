@@ -225,6 +225,7 @@ async function run () {
       warn: core.warning,
       error: core.error
     }
+    logger.child = () => logger
 
     const { entryPointUrl } = await deploy({
       deployServiceHost,
