@@ -1,0 +1,18 @@
+name: 'Platformatic DB Deployer'
+description: 'Deploy a Platformatic DB application to the cloud'
+inputs:
+  github_token:
+    description: 'GitHub token'
+    required: true
+  platformatic_workspace_id:
+    description: 'Platformatic workspace ID'
+    required: true
+  platformatic_workspace_key:
+    description: 'Platformatic workspace key'
+    required: true
+  platformatic_deployment_id:
+    description: 'Platformatic deployment id for calculate-risk action'
+    required: false
+runs:
+  using: 'node16'
+  main: 'index.js'
