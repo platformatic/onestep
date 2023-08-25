@@ -161,11 +161,7 @@ async function run () {
 
     const workspaceId = core.getInput('platformatic_workspace_id')
     const workspaceKey = core.getInput('platformatic_workspace_key')
-
     const deploymentId = core.getInput('platformatic_deployment_id')
-    if (!deploymentId) {
-      throw new Error('Missing platformatic_deployment_id input')
-    }
 
     const deployServiceHost = process.env.DEPLOY_SERVICE_HOST ||
       PROD_DEPLOY_SERVICE_HOST
