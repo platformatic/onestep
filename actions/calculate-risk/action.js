@@ -99,9 +99,8 @@ function generateTracesImpactedComment (tracesImpacted) {
 
   for (let i = 0; i < tracesImpacted.length; i++) {
     const impactedServiceOperations = tracesImpacted[i]
-    const revertedOperations = impactedServiceOperations.reverse()
     comment += `START${i}[ ]`
-    for (const impactedOperation of revertedOperations) {
+    for (const impactedOperation of impactedServiceOperations) {
       const telemetryName = impactedOperation.telemetryName
       const { method, path } = impactedOperation.operation
       comment += `-- ${method} ${path} --> ${telemetryName}(${telemetryName})`
@@ -110,8 +109,8 @@ function generateTracesImpactedComment (tracesImpacted) {
     comment += `style START${i} fill:#FFFFFF00, stroke:#FFFFFF00\n`
 
     const color = getRandomColor()
-    for (let j = 0; j < revertedOperations.length; j++) {
-      const impactedOperation = revertedOperations[j]
+    for (let j = 0; j < impactedServiceOperations.length; j++) {
+      const impactedOperation = impactedServiceOperations[j]
       const telemetryName = impactedOperation.telemetryName
 
       comment += `style ${telemetryName} stroke:#21FA90,stroke-width:1px\n`
