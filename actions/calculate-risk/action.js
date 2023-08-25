@@ -87,20 +87,42 @@ function generateOperationChangeTitle (operationDetails, changesType) {
   throw new Error(`Unsupported operation protocol: ${protocol}`)
 }
 
+// function generateTracesImpactedComment (tracesImpacted) {
+//   let comment = ''
+
+//   if (tracesImpacted.length === 0) return comment
+
+//   comment += '#### Impacted operation traces:\n\n'
+//   for (const impactedServiceOperations of tracesImpacted) {
+//     for (const impactedOperation of impactedServiceOperations) {
+//       const telemetryName = impactedOperation.telemetryName
+//       const { method, path } = impactedOperation.operation
+//       comment += `- service: \`${telemetryName}\`; route \`${method.toUpperCase()}\` \`${path}\`\n\n`
+//     }
+//     comment += '<br />'
+//   }
+
+//   return comment
+// }
+
 function generateTracesImpactedComment (tracesImpacted) {
   let comment = ''
 
   if (tracesImpacted.length === 0) return comment
 
   comment += '#### Impacted operation traces:\n\n'
+  comment += '```mermaid\ngraph LR;'
+
   for (const impactedServiceOperations of tracesImpacted) {
-    for (const impactedOperation of impactedServiceOperations) {
+    const revertedOperations = impactedServiceOperations.reverse()
+    for (const impactedOperation of revertedOperations) {
       const telemetryName = impactedOperation.telemetryName
       const { method, path } = impactedOperation.operation
-      comment += `- service: \`${telemetryName}\`; route \`${method.toUpperCase()}\` \`${path}\`\n\n`
+      comment += `${telemetryName} -- ${method} ${path} --> `
     }
-    comment += '<br />'
+    comment += '\n'
   }
+  comment += '```'
 
   return comment
 }
