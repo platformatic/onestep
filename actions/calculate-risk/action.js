@@ -87,44 +87,49 @@ function generateOperationChangeTitle (operationDetails, changesType) {
   throw new Error(`Unsupported operation protocol: ${protocol}`)
 }
 
-// function generateTracesImpactedComment (tracesImpacted) {
-//   let comment = ''
-
-//   if (tracesImpacted.length === 0) return comment
-
-//   comment += '#### Impacted operation traces:\n\n'
-//   for (const impactedServiceOperations of tracesImpacted) {
-//     for (const impactedOperation of impactedServiceOperations) {
-//       const telemetryName = impactedOperation.telemetryName
-//       const { method, path } = impactedOperation.operation
-//       comment += `- service: \`${telemetryName}\`; route \`${method.toUpperCase()}\` \`${path}\`\n\n`
-//     }
-//     comment += '<br />'
-//   }
-
-//   return comment
-// }
-
 function generateTracesImpactedComment (tracesImpacted) {
   let comment = ''
 
   if (tracesImpacted.length === 0) return comment
 
   comment += '#### Impacted operation traces:\n\n'
-  comment += '```mermaid\ngraph LR;'
+  comment += '```mermaid\ngraph LR;\n'
 
-  for (const impactedServiceOperations of tracesImpacted) {
+  let linesNumber = 0
+
+  for (let i = 0; i < tracesImpacted.length; i++) {
+    const impactedServiceOperations = tracesImpacted[i]
     const revertedOperations = impactedServiceOperations.reverse()
+    comment += `START${i}[ ]`
     for (const impactedOperation of revertedOperations) {
       const telemetryName = impactedOperation.telemetryName
       const { method, path } = impactedOperation.operation
-      comment += `${telemetryName} -- ${method} ${path} --> `
+      comment += `-- ${method} ${path} --> ${telemetryName}(${telemetryName})`
     }
     comment += '\n'
+    comment += `style START${i} fill:#FFFFFF00, stroke:#FFFFFF00\n`
+
+    const color = getRandomColor()
+    for (let j = 0; j < revertedOperations.length; j++) {
+      const impactedOperation = revertedOperations[j]
+      const telemetryName = impactedOperation.telemetryName
+
+      comment += `style ${telemetryName} stroke:#21FA90,stroke-width:1px\n`
+      comment += `linkStyle ${linesNumber++} stroke-width:2px,fill:none,stroke:${color}\n`
+    }
   }
   comment += '```'
 
   return comment
+}
+
+function getRandomColor () {
+  const letters = '0123456789ABCDEF'
+  let color = '#'
+  for (let i = 0; i < 6; i++) {
+    color += letters[Math.floor(Math.random() * 16)]
+  }
+  return color
 }
 
 function generateOperationChangesComment (operationChanges) {
