@@ -118,7 +118,7 @@ function generateTracesImpactedComment (tracesImpacted) {
       comment += `linkStyle ${linesNumber++} stroke-width:2px,fill:none,stroke:${color}\n`
     }
   }
-  comment += '```'
+  comment += '```\n\n'
 
   return comment
 }
