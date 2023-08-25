@@ -92,15 +92,14 @@ function generateTracesImpactedComment (tracesImpacted) {
 
   if (tracesImpacted.length === 0) return comment
 
-  comment += '#### Impacted operations in other services:\n\n'
+  comment += '#### Impacted operation traces:\n\n'
   for (const impactedServiceOperations of tracesImpacted) {
-    const telemetryName = impactedServiceOperations[0].telemetryName
-    comment += `- service \`${telemetryName}\`\n\n`
-
     for (const impactedOperation of impactedServiceOperations) {
+      const telemetryName = impactedOperation.telemetryName
       const { method, path } = impactedOperation.operation
-      comment += `  - route \`${method.toUpperCase()}\` \`${path}\`\n\n`
+      comment += `- service: \`${telemetryName}\`; route \`${method.toUpperCase()}\` \`${path}\`\n\n`
     }
+    comment += '<br />'
   }
 
   return comment
