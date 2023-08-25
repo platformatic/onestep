@@ -103,7 +103,7 @@ function generateTracesImpactedComment (tracesImpacted) {
     for (const impactedOperation of impactedServiceOperations) {
       const telemetryName = impactedOperation.telemetryName
       const { method, path } = impactedOperation.operation
-      comment += `-- ${method} ${path} --> ${telemetryName}(${telemetryName})`
+      comment += `-- "${method} ${path}" --> ${telemetryName}(${telemetryName})`
     }
     comment += '\n'
     comment += `style START${i} fill:#FFFFFF00, stroke:#FFFFFF00\n`
