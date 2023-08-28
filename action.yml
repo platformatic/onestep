@@ -28,10 +28,8 @@ inputs:
   post_pr_comment:
     description: 'Configure whether comments with preview app URLs are posted on pull requests'
     required: false
-    default: 'true'
+    default: true
 outputs:
-  deployment_id:
-    description: 'Platformatic deployment ID'
   platformatic_app_url:
     description: 'URL of the deployed Platformatic DB application'
 runs:
