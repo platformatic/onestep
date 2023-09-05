@@ -6,7 +6,7 @@ const core = require('@actions/core')
 const github = require('@actions/github')
 const { deploy } = require('@platformatic/deploy-client')
 
-const PLT_MESSAGE_REGEXP = /\*\*Your application was successfully deployed!\*\* :rocket:\nApplication url: (.*).*/
+const PLT_MESSAGE_REGEXP = /\*\*Your application was successfully deployed.*!\*\* :rocket:\nApplication url: (.*).*/
 
 // TODO: move port and database_url to secrets
 const PLATFORMATIC_VARIABLES = ['PORT', 'DATABASE_URL']
@@ -154,7 +154,7 @@ async function findLastPlatformaticComment (octokit) {
 
 function createPlatformaticComment (applicationUrl, commitHash, commitUrl) {
   return [
-    '**Your application was successfully deployed!** :rocket:',
+    '**Your application was successfully deployed by [Plaformatic](https://platformatic.dev)!** :rocket:',
     `Application url: ${applicationUrl}`,
     `Built from the commit: [${commitHash.slice(0, 7)}](${commitUrl})`
   ].join('\n')
