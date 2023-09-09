@@ -33,5 +33,5 @@ outputs:
   platformatic_app_url:
     description: 'URL of the deployed Platformatic DB application'
 runs:
-  using: 'node18'
+  using: 'node20'
   main: 'index.js'
