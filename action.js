@@ -227,7 +227,7 @@ async function run () {
     }
     logger.child = () => logger
 
-    const { entryPointUrl } = await deploy({
+    const { deploymentId, entryPointUrl } = await deploy({
       deployServiceHost,
       workspaceId,
       workspaceKey,
@@ -257,6 +257,7 @@ async function run () {
       }
     }
 
+    core.setOutput('deployment_id', deploymentId)
     core.setOutput('platformatic_app_url', entryPointUrl)
   } catch (error) {
     core.setFailed(error.message)
