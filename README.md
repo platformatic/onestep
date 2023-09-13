@@ -45,6 +45,55 @@ jobs:
         run: echo '${{ steps.deploy-app.outputs.platformatic_app_url }}'
 ```
 
+## Deploy app to the dynamic workspace and calculate the risk
+
+Example usage:
+
+```yml
+name: Deploy Platformatic application to the cloud
+on:
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+
+jobs:
+  build_and_deploy:
+    permissions:
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout application project repository
+        uses: actions/checkout@v3
+      - name: npm install --omit=dev
+        run: npm install --omit=dev
+      - name: Deploy project
+        id: deploy-project
+        uses: platformatic/onestep@latest
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          platformatic_workspace_id: ${{ secrets.PLATFORMATIC_DYNAMIC_WORKSPACE_ID }}
+          platformatic_workspace_key: ${{ secrets.PLATFORMATIC_DYNAMIC_WORKSPACE_API_KEY }}
+          platformatic_config_path: ./platformatic.service.json
+    outputs:
+      deployment_id: ${{ steps.deploy-project.outputs.deployment_id }}
+  calculate_risk:
+    permissions:
+      contents: read
+      pull-requests: write
+    needs: build_and_deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Calculate risk
+        uses: platformatic/onestep/actions/calculate-risk@latest
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          platformatic_workspace_id: ${{ secrets.PLATFORMATIC_DYNAMIC_WORKSPACE_ID }}
+          platformatic_workspace_key: ${{ secrets.PLATFORMATIC_DYNAMIC_WORKSPACE_API_KEY }}
+          platformatic_deployment_id: ${{ needs.build_and_deploy.outputs.deployment_id }}
+```
+
 ## Monorepo/Subdirectory support
 
 Use the [`jobs.<job_id>.defaults.run.working-directory`](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#defaultsrun) to specify the subdirectory of the project to deploy, this will ensure that all commands are run from the correct directory.
