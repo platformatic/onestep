@@ -1,5 +1,7 @@
 'use strict'
 
+const { join } = require('node:path')
+const { readFileSync } = require('node:fs')
 const { execSync } = require('node:child_process')
 
 function installDependencies () {
@@ -9,6 +11,7 @@ function installDependencies () {
       cwd: __dirname,
       timeout: 2 * 60 * 1000
     })
+    console.log(readFileSync(join(__dirname, 'package.json')).toString())
     console.log(result.toString())
   } catch (error) {
     console.error('Failed to install platformatic dependencies.', error)
