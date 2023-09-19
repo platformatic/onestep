@@ -46,7 +46,7 @@ function generateRisksComment (risks) {
   for (const workspaceRisks of risks) {
     const { workspaceName, overallRisk, services } = workspaceRisks
 
-    const riskPercentage = overallRisk * 100
+    const riskPercentage = (overallRisk * 100).toFixed(2)
     comment += `### The risk of deploying to the \`${workspaceName}\` workspace is ${riskPercentage}%!\n\n`
 
     for (const service of services) {
