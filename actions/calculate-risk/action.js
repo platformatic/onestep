@@ -51,7 +51,7 @@ function generateRisksComment (risks) {
 
     for (const service of services) {
       comment += '<br />'
-      comment += `Breaking changes for the \`${service.telemetryName}\` service:\n\n`
+      comment += `Changes for the \`${service.telemetryName}\` service:\n\n`
 
       for (const operation of service.operations) {
         const operationDetails = operation.operation
