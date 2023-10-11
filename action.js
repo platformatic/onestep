@@ -180,11 +180,13 @@ async function updatePlatformaticComment (octokit, commentId, comment) {
   })
 }
 
+const allowedEvents = ['push', 'pull_request', 'workflow_dispatch']
+
 async function run () {
   try {
     const eventName = process.env.GITHUB_EVENT_NAME
-    if (eventName !== 'push' && eventName !== 'pull_request') {
-      throw new Error('The action only works on push and pull_request events')
+    if (!allowedEvents.includes(eventName)) {
+      throw new Error('The action only works on push, pull_request and workflow_dispatch events')
     }
 
     const workspaceId = core.getInput('platformatic_workspace_id')
@@ -217,7 +219,7 @@ async function run () {
 
     const label = isPullRequest
       ? `github-pr:${githubMetadata.pullRequest.number}`
-      : null
+      : core.getInput('label')
 
     const logger = {
       trace: () => {},

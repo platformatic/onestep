@@ -877,6 +877,203 @@ test('action should fail if action is called by unsupported event', async (t) =>
     t.equal(err.exitCode, 1)
 
     const lastLine = err.stdout.split('\n').pop()
-    t.equal(lastLine, '::error::The action only works on push and pull_request events')
+    t.equal(lastLine, '::error::The action only works on push, pull_request and workflow_dispatch events')
   }
+})
+
+test('action should successfully deploy platformatic project from workflow_dispatch event', async (t) => {
+  t.plan(15)
+
+  const bundleId = 'test-bundle-id'
+  const token = 'test-upload-token'
+
+  const workspaceId = 'test-workspace-id'
+  const workspaceKey = 'test-workspace-key'
+
+  const entryPointUrl = await startMachine(t, () => {
+    t.pass('Action should make a prewarm request to the machine')
+  })
+
+  await startDeployService(
+    t,
+    {
+      createBundleCallback: (request, reply) => {
+        t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
+        t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
+
+        const { bundle, repository, branch, commit, pullRequest } = request.body
+
+        t.equal(bundle.appType, 'db')
+        t.equal(bundle.configPath, 'platformatic.db.json')
+        t.ok(bundle.checksum)
+
+        t.same(repository, {
+          name: 'test-repo-name',
+          url: 'https://github.com/test-github-user/test-repo-name',
+          githubRepoId: 1234
+        })
+
+        t.same(branch, {
+          name: 'test'
+        })
+
+        t.same(commit, {
+          sha: '1234',
+          username: 'test-github-user',
+          additions: 1,
+          deletions: 1
+        })
+
+        t.same(pullRequest, undefined)
+
+        reply.code(200).send({ id: bundleId, token, isBundleUploaded: false })
+      },
+      createDeploymentCallback: (request, reply) => {
+        t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
+        t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
+        t.equal(request.headers.authorization, `Bearer ${token}`)
+        t.same(
+          request.body,
+          {
+            label: null,
+            metadata: {
+              appType: 'db'
+            },
+            variables: {
+              ENV_VARIABLE_1: 'value1',
+              ENV_VARIABLE_2: 'value2',
+              PLT_ENV_VARIABLE: 'value4',
+              PLT_ENV_VARIABLE1: 'platformatic_variable1',
+              PLT_ENV_VARIABLE2: 'platformatic_variable2'
+            },
+            secrets: {
+              ENV_VARIABLE_3: 'value3'
+            }
+          }
+        )
+        reply.code(200).send({ entryPointUrl })
+      },
+      uploadCallback: (request) => {
+        t.equal(request.headers.authorization, `Bearer ${token}`)
+      }
+    }
+  )
+
+  await execaNode('execute.js', {
+    cwd: __dirname,
+    env: {
+      GITHUB_EVENT_NAME: 'workflow_dispatch',
+
+      INPUT_PLATFORMATIC_WORKSPACE_ID: workspaceId,
+      INPUT_PLATFORMATIC_WORKSPACE_KEY: workspaceKey,
+      INPUT_GITHUB_TOKEN: 'test',
+      INPUT_VARIABLES: 'ENV_VARIABLE_1,ENV_VARIABLE_2',
+      INPUT_SECRETS: 'ENV_VARIABLE_3',
+
+      ENV_VARIABLE_1: 'value1',
+      ENV_VARIABLE_2: 'value2',
+      ENV_VARIABLE_3: 'value3',
+      PLT_ENV_VARIABLE: 'value4',
+      IGNORED_ENV_VARIABLE: 'ignore'
+    }
+  })
+})
+
+test('action should successfully deploy platformatic project from workflow_dispatch event with label', async (t) => {
+  t.plan(15)
+
+  const bundleId = 'test-bundle-id'
+  const token = 'test-upload-token'
+
+  const workspaceId = 'test-workspace-id'
+  const workspaceKey = 'test-workspace-key'
+
+  const entryPointUrl = await startMachine(t, () => {
+    t.pass('Action should make a prewarm request to the machine')
+  })
+
+  await startDeployService(
+    t,
+    {
+      createBundleCallback: (request, reply) => {
+        t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
+        t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
+
+        const { bundle, repository, branch, commit, pullRequest } = request.body
+
+        t.equal(bundle.appType, 'db')
+        t.equal(bundle.configPath, 'platformatic.db.json')
+        t.ok(bundle.checksum)
+
+        t.same(repository, {
+          name: 'test-repo-name',
+          url: 'https://github.com/test-github-user/test-repo-name',
+          githubRepoId: 1234
+        })
+
+        t.same(branch, {
+          name: 'test'
+        })
+
+        t.same(commit, {
+          sha: '1234',
+          username: 'test-github-user',
+          additions: 1,
+          deletions: 1
+        })
+
+        t.same(pullRequest, undefined)
+
+        reply.code(200).send({ id: bundleId, token, isBundleUploaded: false })
+      },
+      createDeploymentCallback: (request, reply) => {
+        t.equal(request.headers['x-platformatic-workspace-id'], workspaceId)
+        t.equal(request.headers['x-platformatic-api-key'], workspaceKey)
+        t.equal(request.headers.authorization, `Bearer ${token}`)
+        t.same(
+          request.body,
+          {
+            label: 'label-123',
+            metadata: {
+              appType: 'db'
+            },
+            variables: {
+              ENV_VARIABLE_1: 'value1',
+              ENV_VARIABLE_2: 'value2',
+              PLT_ENV_VARIABLE: 'value4',
+              PLT_ENV_VARIABLE1: 'platformatic_variable1',
+              PLT_ENV_VARIABLE2: 'platformatic_variable2'
+            },
+            secrets: {
+              ENV_VARIABLE_3: 'value3'
+            }
+          }
+        )
+        reply.code(200).send({ entryPointUrl })
+      },
+      uploadCallback: (request) => {
+        t.equal(request.headers.authorization, `Bearer ${token}`)
+      }
+    }
+  )
+
+  await execaNode('execute.js', {
+    cwd: __dirname,
+    env: {
+      GITHUB_EVENT_NAME: 'workflow_dispatch',
+      INPUT_LABEL: 'label-123',
+
+      INPUT_PLATFORMATIC_WORKSPACE_ID: workspaceId,
+      INPUT_PLATFORMATIC_WORKSPACE_KEY: workspaceKey,
+      INPUT_GITHUB_TOKEN: 'test',
+      INPUT_VARIABLES: 'ENV_VARIABLE_1,ENV_VARIABLE_2',
+      INPUT_SECRETS: 'ENV_VARIABLE_3',
+
+      ENV_VARIABLE_1: 'value1',
+      ENV_VARIABLE_2: 'value2',
+      ENV_VARIABLE_3: 'value3',
+      PLT_ENV_VARIABLE: 'value4',
+      IGNORED_ENV_VARIABLE: 'ignore'
+    }
+  })
 })
