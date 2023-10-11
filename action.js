@@ -70,7 +70,7 @@ async function getGithubMetadata (octokit, isPullRequest) {
 
   const commitSha = isPullRequest
     ? github.context.payload.pull_request.head.sha
-    : (github.context.payload.head_commit?.id || github.context.sha)
+    : (github.context.payload.head_commit?.id || github.context.payload.sha)
 
   const commitMetadata = await getHeadCommitMetadata(octokit, commitSha)
 

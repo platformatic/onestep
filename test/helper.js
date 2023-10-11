@@ -43,9 +43,7 @@ async function createRepository (actionFolder, repositoryOptions = {}) {
   } else if (eventName === 'workflow_dispatch') {
     process.env.GITHUB_REF_NAME = 'test'
     process.env.GITHUB_HEAD_REF = ''
-    payload.head_commit = {
-      id: commitSha
-    }
+    payload.sha = commitSha
   }
 
   const githubEventConfigPath = join(actionFolder, 'github_event.json')
