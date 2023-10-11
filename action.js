@@ -262,6 +262,7 @@ async function run () {
     core.setOutput('deployment_id', deploymentId)
     core.setOutput('platformatic_app_url', entryPointUrl)
   } catch (error) {
+    console.error(error)
     core.setFailed(error.message)
   }
 }
