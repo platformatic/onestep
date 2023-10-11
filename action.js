@@ -219,7 +219,7 @@ async function run () {
 
     const label = isPullRequest
       ? `github-pr:${githubMetadata.pullRequest.number}`
-      : core.getInput('label')
+      : (core.getInput('label') || null)
 
     const logger = {
       trace: () => {},
