@@ -68,11 +68,9 @@ async function getGithubMetadata (octokit, isPullRequest) {
   const repositoryMetadata = getRepositoryMetadata()
   const branchMetadata = getBranchMetadata()
 
-  console.log(JSON.stringify(github.context, null, 2))
-
   const commitSha = isPullRequest
     ? github.context.payload.pull_request.head.sha
-    : github.context.payload.head_commit.id
+    : (github.context.payload.head_commit?.id || github.context.sha)
 
   const commitMetadata = await getHeadCommitMetadata(octokit, commitSha)
 
