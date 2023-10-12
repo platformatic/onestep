@@ -29,6 +29,9 @@ inputs:
     description: 'Configure whether comments with preview app URLs are posted on pull requests'
     required: false
     default: 'true'
+  label:
+    description: 'Label to identify the preview application to replace. Set by default to PR number if available'
+    required: false
 outputs:
   deployment_id:
     description: 'Platformatic deployment ID'

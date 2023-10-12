@@ -70,7 +70,7 @@ async function getGithubMetadata (octokit, isPullRequest) {
 
   const commitSha = isPullRequest
     ? github.context.payload.pull_request.head.sha
-    : github.context.payload.head_commit.id
+    : (github.context.payload.head_commit?.id || github.context.payload.sha)
 
   const commitMetadata = await getHeadCommitMetadata(octokit, commitSha)
 
@@ -180,11 +180,13 @@ async function updatePlatformaticComment (octokit, commentId, comment) {
   })
 }
 
+const allowedEvents = ['push', 'pull_request', 'workflow_dispatch']
+
 async function run () {
   try {
     const eventName = process.env.GITHUB_EVENT_NAME
-    if (eventName !== 'push' && eventName !== 'pull_request') {
-      throw new Error('The action only works on push and pull_request events')
+    if (!allowedEvents.includes(eventName)) {
+      throw new Error('The action only works on push, pull_request and workflow_dispatch events')
     }
 
     const workspaceId = core.getInput('platformatic_workspace_id')
@@ -217,7 +219,7 @@ async function run () {
 
     const label = isPullRequest
       ? `github-pr:${githubMetadata.pullRequest.number}`
-      : null
+      : (core.getInput('label') || null)
 
     const logger = {
       trace: () => {},
@@ -260,6 +262,7 @@ async function run () {
     core.setOutput('deployment_id', deploymentId)
     core.setOutput('platformatic_app_url', entryPointUrl)
   } catch (error) {
+    console.error(error)
     core.setFailed(error.message)
   }
 }
