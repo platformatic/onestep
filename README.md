@@ -10,6 +10,12 @@ on:
     paths-ignore:
       - 'docs/**'
       - '**.md'
+  workflow_dispatch:
+    inputs:
+      label:
+        description: "Preview Label"
+        required: true
+        default: ""
 
 jobs:
   build_and_deploy:
@@ -35,6 +41,7 @@ jobs:
           post_pr_comment: false
           variables: custom_variable1, custom_variable2
           secrets: custom_secret1
+          label: ${{ github.event.inputs.label }}
         env:
           plt_custom_variable: test1
           custom_variable1: test2
@@ -56,6 +63,12 @@ on:
     paths-ignore:
       - 'docs/**'
       - '**.md'
+  workflow_dispatch:
+    inputs:
+      label:
+        description: "Preview Label"
+        required: true
+        default: ""
 
 jobs:
   build_and_deploy:
@@ -76,6 +89,7 @@ jobs:
           platformatic_workspace_id: ${{ secrets.PLATFORMATIC_DYNAMIC_WORKSPACE_ID }}
           platformatic_workspace_key: ${{ secrets.PLATFORMATIC_DYNAMIC_WORKSPACE_API_KEY }}
           platformatic_config_path: ./platformatic.service.json
+          label: ${{ github.event.inputs.label }}
     outputs:
       deployment_id: ${{ steps.deploy-project.outputs.deployment_id }}
   calculate_risk:
@@ -87,6 +101,7 @@ jobs:
     steps:
       - name: Calculate risk
         uses: platformatic/onestep/actions/calculate-risk@latest
+        if: github.event_name == 'pull_request'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           platformatic_workspace_id: ${{ secrets.PLATFORMATIC_DYNAMIC_WORKSPACE_ID }}
@@ -125,6 +140,12 @@ on:
     paths-ignore:
       - 'docs/**'
       - '**.md'
+  workflow_dispatch:
+    inputs:
+      label:
+        description: "Preview Label"
+        required: true
+        default: ""
 
 jobs:
   build_and_deploy:
@@ -150,6 +171,7 @@ jobs:
           post_pr_comment: false
           variables: custom_variable1, custom_variable2
           secrets: custom_secret1
+          label: ${{ github.event.inputs.label }}
         env:
           deploy_service_host: https://development.com
           plt_custom_variable: test1
