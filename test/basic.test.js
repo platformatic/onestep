@@ -532,7 +532,7 @@ test('action should fail if there is no platformatic_workspace_key input param',
     t.equal(err.exitCode, 1)
 
     const lastLine = err.stdout.split('\n').pop()
-    t.equal(lastLine, '::error::platformatic_workspace_key action param is required')
+    t.equal(lastLine, '::error::platformatic workspace key or user api key is required')
   }
 })
 
