@@ -218,7 +218,7 @@ function generateGraphQLChangesComment (changes, diff) {
     comment += `path \`${path}\`\n\n`
   }
   if (diff) {
-    comment += '### Schema changes:\n\n'
+    comment += '### GraphQL Schema changes:\n\n'
     comment += '```diff\n' + diff + '```\n\n'
   }
 
