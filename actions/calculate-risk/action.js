@@ -77,9 +77,9 @@ function generateRisksComment (risks) {
 
         // In GraphQL we have to list all the changes first, because we don't have the concept of "operations"
         // i.e. is we change a type, all the queries and mutations that use that type will be impacted
-        comment += generateGraphQLChangesComment(service.changes)
+        comment += generateGraphQLChangesComment(service.changes, service.diff)
 
-        comment += '#### GraphQL Operations impacted by the changes:\n\n'
+        comment += '### GraphQL Operations impacted by the changes:\n\n'
         const queries = service.operations.filter(operation => operation.operation.method === 'QUERY')
         const mutations = service.operations.filter(operation => operation.operation.method === 'MUTATION')
         for (const query of queries.concat(mutations)) {
@@ -210,6 +210,7 @@ function generateDiffComment (before, after) {
 
 function generateGraphQLChangesComment (changes, diff) {
   let comment = ''
+
   for (const change of changes) {
     const message = change.message
     const path = change.path
@@ -217,8 +218,10 @@ function generateGraphQLChangesComment (changes, diff) {
     comment += `path \`${path}\`\n\n`
   }
   if (diff) {
+    comment += '### Schema changes:\n\n'
     comment += '```diff\n' + diff + '```\n\n'
   }
+
   return comment
 }
 
