@@ -229,7 +229,7 @@ function generateGraphQLSchemaDiff (diff) {
   let comment = ''
   if (diff) {
     comment += '<details>\n'
-    comment += '<summary>### GraphQL Schema changes:</summary>\n\n'
+    comment += '<summary>Schema changes</summary>\n\n'
     comment += '```diff\n' + diff + '```\n\n'
     comment += '</details>\n\n'
   }
