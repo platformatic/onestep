@@ -125,7 +125,7 @@ function generateOperationChangeTitle (operationDetails, changesType) {
 }
 
 function generateGraphQLOperationChangeTitle (operationDetails) {
-  const { protocol, method, path } = operationDetails
+  const { method, path } = operationDetails
   if (method === 'QUERY') {
     return `<b>${method.toUpperCase()}</b> <code>${path}</code> query was modified`
   } else if (method === 'MUTATION') {
