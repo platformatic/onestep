@@ -85,10 +85,9 @@ function generateRisksComment (risks) {
         for (const query of queries.concat(mutations)) {
           const queryDetails = query.operation
           const tracesImpacted = query.tracesImpacted
-          const path = queryDetails.path
-          const method = queryDetails.method
+          // const path = queryDetails.path
+          // const method = queryDetails.method
 
-          const operationDetails = operation.operation
           const graphQLOperationChangeTitle = generateGraphQLOperationChangeTitle(operationDetails)
 
           comment += '<details>\n'
