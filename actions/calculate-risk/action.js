@@ -72,7 +72,6 @@ function generateRisksComment (risks) {
 
     if (graphQL) {
       const { services: graphQLServices } = graphQL
-      console.log('@@@@@@ graphQLServices', JSON.stringify(graphQLServices, null, 2))
       for (const service of graphQLServices) {
         comment += `<h3>GraphQL Changes for the \`${service.telemetryName}\` service </h3>\n\n`
 
@@ -229,8 +228,10 @@ function generateDiffComment (before, after) {
 function generateGraphQLSchemaDiff (diff) {
   let comment = ''
   if (diff) {
-    comment += '### GraphQL Schema changes:\n\n'
+    comment += '<details>\n'
+    comment += '<summary>### GraphQL Schema changes:</summary>\n\n'
     comment += '```diff\n' + diff + '```\n\n'
+    comment += '</details>\n\n'
   }
   return comment
 }
@@ -238,7 +239,6 @@ function generateGraphQLSchemaDiff (diff) {
 function generateGraphQLSchemaChanges (changes) {
   let comment = ''
   if (!changes) return comment
-  console.log('@@@@@@@@@@@@@@@', changes)
 
   comment += '#### GraphQL schema changes:\n\n'
   for (const change of changes) {
