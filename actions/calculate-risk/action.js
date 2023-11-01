@@ -234,6 +234,7 @@ function generateGraphQLSchemaDiff (diff) {
 
 function generateGraphQLSchemaChanges (changes) {
   let comment = ''
+  console.log('@@@@@@@@@@@@@@@', changes)
 
   comment += '#### GraphQL schema changes:\n\n'
   for (const change of changes) {
