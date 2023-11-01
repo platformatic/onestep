@@ -88,7 +88,7 @@ function generateRisksComment (risks) {
           // const path = queryDetails.path
           // const method = queryDetails.method
 
-          const graphQLOperationChangeTitle = generateGraphQLOperationChangeTitle(operationDetails)
+          const graphQLOperationChangeTitle = generateGraphQLOperationChangeTitle(queryDetails)
 
           comment += '<details>\n'
 
