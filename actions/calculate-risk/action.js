@@ -83,6 +83,7 @@ function generateRisksComment (risks) {
         const queries = service.operations.filter(operation => operation.operation.method === 'QUERY')
         const mutations = service.operations.filter(operation => operation.operation.method === 'MUTATION')
         for (const query of queries.concat(mutations)) {
+          console.log('@@@@@@@@@2', JSON.stringify(query, null, 2))
           const queryDetails = query.operation
           const tracesImpacted = query.tracesImpacted
           // const path = queryDetails.path
