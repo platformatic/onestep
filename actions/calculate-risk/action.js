@@ -72,6 +72,7 @@ function generateRisksComment (risks) {
 
     if (graphQL) {
       const { services: graphQLServices } = graphQL
+      console.log('@@@@@@ graphQLServices', JSON.stringify(graphQLServices, null, 2))
       for (const service of graphQLServices) {
         comment += `<h3>GraphQL Changes for the \`${service.telemetryName}\` service </h3>\n\n`
 
@@ -83,7 +84,6 @@ function generateRisksComment (risks) {
         const queries = service.operations.filter(operation => operation.operation.method === 'QUERY')
         const mutations = service.operations.filter(operation => operation.operation.method === 'MUTATION')
         for (const query of queries.concat(mutations)) {
-          console.log('@@@@@@@@@2', JSON.stringify(query, null, 2))
           const queryDetails = query.operation
           const tracesImpacted = query.tracesImpacted
           // const path = queryDetails.path
@@ -96,9 +96,11 @@ function generateRisksComment (risks) {
           comment += `<summary>${graphQLOperationChangeTitle}</summary>\n\n`
           if (tracesImpacted && tracesImpacted.length !== 0) {
             comment += generateTracesImpactedComment(tracesImpacted)
-            comment += generateGraphQLSchemaChanges(query.changes)
-            // comment += `GraphQL path \`${path}\`\n\n`
           }
+          if (query.changes) {
+            comment += generateGraphQLSchemaChanges(query.changes)
+          }
+          // comment += `GraphQL path \`${path}\`\n\n`
           comment += '</details>\n\n'
         }
       }
