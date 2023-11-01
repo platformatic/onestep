@@ -77,7 +77,7 @@ function generateRisksComment (risks) {
 
         // In GraphQL we have to list all the changes first, because we don't have the concept of "operations"
         // i.e. is we change a type, all the queries and mutations that use that type will be impacted
-        comment += generateGraphQLChangesComment(service.changes, service.diff)
+        comment += generateGraphQLSchemaDiff(service.diff)
 
         comment += '### GraphQL Operations impacted by the changes:\n\n'
         const queries = service.operations.filter(operation => operation.operation.method === 'QUERY')
@@ -88,11 +88,16 @@ function generateRisksComment (risks) {
           const path = queryDetails.path
           const method = queryDetails.method
 
+          const operationDetails = operation.operation
+          const graphQLOperationChangeTitle = generateGraphQLOperationChangeTitle(operationDetails)
+
           comment += '<details>\n'
-          comment += `<summary>${method}${path}</summary>\n\n`
+
+          comment += `<summary>${graphQLOperationChangeTitle}</summary>\n\n`
           if (tracesImpacted && tracesImpacted.length !== 0) {
             comment += generateTracesImpactedComment(tracesImpacted)
-            comment += `GraphQL path \`${path}\`\n\n`
+            comment += generateGraphQLSchemaChanges(query.changes)
+            // comment += `GraphQL path \`${path}\`\n\n`
           }
           comment += '</details>\n\n'
         }
@@ -116,6 +121,17 @@ function generateOperationChangeTitle (operationDetails, changesType) {
     throw new Error(`Unsupported changes type: ${changesType}`)
   }
   throw new Error(`Unsupported operation protocol: ${protocol}`)
+}
+
+function generateGraphQLOperationChangeTitle (operationDetails) {
+  const { protocol, method, path } = operationDetails
+  if (method === 'QUERY') {
+    return `<b>${method.toUpperCase()}</b> <code>${path}</code> query was modified`
+  } else if (method === 'MUTATION') {
+    return `<b>${method.toUpperCase()}</b> <code>${path}</code> mutation was modified`
+  } else {
+    throw new Error(`Unsupported method: ${method}`)
+  }
 }
 
 function generateTracesImpactedComment (tracesImpacted) {
@@ -208,18 +224,24 @@ function generateDiffComment (before, after) {
   return '```diff\n' + _before + _after + '```\n\n'
 }
 
-function generateGraphQLChangesComment (changes, diff) {
+function generateGraphQLSchemaDiff (diff) {
   let comment = ''
-
-  for (const change of changes) {
-    const message = change.message
-    const path = change.path
-    comment += `#### ${message}\n\n`
-    comment += `path \`${path}\`\n\n`
-  }
   if (diff) {
     comment += '### GraphQL Schema changes:\n\n'
     comment += '```diff\n' + diff + '```\n\n'
+  }
+  return comment
+}
+
+function generateGraphQLSchemaChanges (changes) {
+  let comment = ''
+
+  comment += '#### GraphQL schema changes:\n\n'
+  for (const change of changes) {
+    const message = change.message
+    const path = change.path
+    comment += `##### ${message}\n\n`
+    comment += `path \`${path}\`\n\n`
   }
 
   return comment
