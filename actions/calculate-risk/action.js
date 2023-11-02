@@ -44,18 +44,20 @@ async function calculateDeploymentRisks (
 function generateRisksComment (risks) {
   let comment = ''
   for (const workspaceRisks of risks) {
-    const { workspaceName, overallRisk, services } = workspaceRisks
+    const { workspaceName, overallRisk, services, openAPI, graphQL } = workspaceRisks
 
     const riskPercentage = (overallRisk * 100).toFixed(2)
-    comment += `### The risk of deploying to the \`${workspaceName}\` workspace is ${riskPercentage}%!\n\n`
+    comment += `## The risk of deploying to the \`${workspaceName}\` workspace is ${riskPercentage}%!\n\n`
 
-    for (const service of services) {
-      comment += '<br />'
-      comment += `Changes for the \`${service.telemetryName}\` service:\n\n`
+    // To support the old version of the core risk management, which returns `services` instead of `openAPI`
+    const openAPIServices = openAPI?.services || services
+
+    for (const service of openAPIServices) {
+      comment += `<h3>OpenAPI Changes for the \`${service.telemetryName}\` service</h3> \n\n`
 
       for (const operation of service.operations) {
         const operationDetails = operation.operation
-        const changesType = operation.changes.type
+        const changesType = operation?.changes?.type
 
         const operationChangeTitle = generateOperationChangeTitle(operationDetails, changesType)
 
@@ -65,6 +67,41 @@ function generateRisksComment (risks) {
         comment += generateTracesImpactedComment(operation.tracesImpacted)
         comment += generateOperationChangesComment(operation.changes)
         comment += '</details>\n\n'
+      }
+    }
+
+    if (graphQL) {
+      const { services: graphQLServices } = graphQL
+      for (const service of graphQLServices) {
+        comment += `<h3>GraphQL Changes for the \`${service.telemetryName}\` service </h3>\n\n`
+
+        // In GraphQL we have to list all the changes first, because we don't have the concept of "operations"
+        // i.e. is we change a type, all the queries and mutations that use that type will be impacted
+        comment += generateGraphQLSchemaDiff(service.diff)
+
+        comment += '### GraphQL Operations impacted by the changes:\n\n'
+        const queries = service.operations.filter(operation => operation.operation.method === 'QUERY')
+        const mutations = service.operations.filter(operation => operation.operation.method === 'MUTATION')
+        for (const query of queries.concat(mutations)) {
+          const queryDetails = query.operation
+          const tracesImpacted = query.tracesImpacted
+          // const path = queryDetails.path
+          // const method = queryDetails.method
+
+          const graphQLOperationChangeTitle = generateGraphQLOperationChangeTitle(queryDetails)
+
+          comment += '<details>\n'
+
+          comment += `<summary>${graphQLOperationChangeTitle}</summary>\n\n`
+          if (tracesImpacted && tracesImpacted.length !== 0) {
+            comment += generateTracesImpactedComment(tracesImpacted)
+          }
+          if (query.changes) {
+            comment += generateGraphQLSchemaChanges(query.changes)
+          }
+          // comment += `GraphQL path \`${path}\`\n\n`
+          comment += '</details>\n\n'
+        }
       }
     }
   }
@@ -85,6 +122,17 @@ function generateOperationChangeTitle (operationDetails, changesType) {
     throw new Error(`Unsupported changes type: ${changesType}`)
   }
   throw new Error(`Unsupported operation protocol: ${protocol}`)
+}
+
+function generateGraphQLOperationChangeTitle (operationDetails) {
+  const { method, path } = operationDetails
+  if (method === 'QUERY') {
+    return `<b>${method.toUpperCase()}</b> <code>${path}</code> query was modified`
+  } else if (method === 'MUTATION') {
+    return `<b>${method.toUpperCase()}</b> <code>${path}</code> mutation was modified`
+  } else {
+    throw new Error(`Unsupported method: ${method}`)
+  }
 }
 
 function generateTracesImpactedComment (tracesImpacted) {
@@ -177,6 +225,32 @@ function generateDiffComment (before, after) {
   return '```diff\n' + _before + _after + '```\n\n'
 }
 
+function generateGraphQLSchemaDiff (diff) {
+  let comment = ''
+  if (diff) {
+    comment += '<details>\n'
+    comment += '<summary>Schema changes</summary>\n\n'
+    comment += '```diff\n' + diff + '```\n\n'
+    comment += '</details>\n\n'
+  }
+  return comment
+}
+
+function generateGraphQLSchemaChanges (changes) {
+  let comment = ''
+  if (!changes) return comment
+
+  comment += '#### GraphQL schema changes:\n\n'
+  for (const change of changes) {
+    const message = change.message
+    const path = change.path
+    comment += `##### ${message}\n\n`
+    comment += `path \`${path}\`\n\n`
+  }
+
+  return comment
+}
+
 async function run () {
   try {
     const eventName = process.env.GITHUB_EVENT_NAME
@@ -204,10 +278,10 @@ async function run () {
     )
 
     core.info('Deployment risks calculated')
-
     const message = generateRisksComment(risks)
     await postPlatformaticComment(octokit, message)
   } catch (error) {
+    console.trace(error)
     core.setFailed(error.message)
   }
 }
